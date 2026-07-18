@@ -371,9 +371,3 @@ required at runtime.
       `CommunityEvent`, ...)
 - [ ] Additional modules beyond `GameStatus`: `Vehicle`, `Garage`,
       `TeamEvent`, ...
-
-## Inspiration
-
-- [Geode SDK](https://geode-sdk.org/) (Geometry Dash)
-- Cocos2d-x architecture
-- Metadata-driven design
