@@ -148,16 +148,15 @@ print("========================================")
 --==================================================
 -- BitMask usage demo
 --==================================================
+Nebula.GameStatus.set("safeCoins", 1000000)
+
+Nebula.GameStatus.set("safeDiamonds", 1000000)
+
 
 local flags, flagsErr = Nebula.GameStatus.get("flags")
 if flags then
     
-    flags:enable("IsPitCrew")
-    flags:disable("MemoryHacker")
-    flags:disable("TooMuchCoins")
-    flags:disable("TooMuchGems")
-    flags:disable("DebuggerDetected")
-    flags:disable("MemoryHacker")
+    flags:disable("ManuallyBanned")
     
     local ok, err = Nebula.GameStatus.set("flags", flags)
     print("flags write ok =", ok, "err =", err)
