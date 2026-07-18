@@ -1,0 +1,3098 @@
+-- Packed by bundle.py  •  2026-07-18 09:59:13
+
+-- Do not edit — regenerate with:  python bundle.py
+
+
+local __vfs = {}
+
+__vfs['api/GameStatus.lua'] = function(...)
+--==================================================
+-- api/GameStatus.lua
+--==================================================
+-- Public-facing Nebula.GameStatus module.
+--
+--   Nebula.GameStatus.get("coins")
+--   Nebula.GameStatus.set("coins", 999)
+--   Nebula.GameStatus.set("cheater", true):force()
+--   Nebula.GameStatus.set("coins", 999):dry()
+--   Nebula.GameStatus.has("device")
+--   Nebula.GameStatus.add("coins", 1000)
+--   Nebula.GameStatus.add("coins", 1000):dry()
+--   Nebula.GameStatus.sub("coins", 500)
+--   Nebula.GameStatus.meta("coins")
+
+local Memory   = loadModule("core/Memory.lua")
+local Type     = loadModule("core/Type.lua")
+local Repeated = loadModule("core/Repeated.lua")
+local metadata = loadModule("metadata/GameStatus.lua")
+
+local M = {}
+
+-- Fields considered dangerous enough to require :force().
+local DANGEROUS_FIELDS = {
+    cheater = true,
+}
+
+-- Cached per script session — resolveGameStatusBase() is an
+-- expensive signature scan, only run it once unless forced.
+local baseAddress = nil
+
+-- Cache for enum module loads. loadModule() re-reads and
+-- re-executes the file from disk every call — with no cache, every
+-- BitMask get/set/log line pays that cost again, which adds up
+-- fast when scanning many fields in a loop.
+local enumCache = {}
+
+---@param enumName string|table
+---@return table|nil
+local function resolveEnum(enumName)
+    if type(enumName) == "table" then
+        return enumName
+    end
+    if enumCache[enumName] ~= nil then
+        return enumCache[enumName]
+    end
+    local enum = loadModule("metadata/enums/" .. enumName .. ".lua")
+    enumCache[enumName] = enum
+    return enum
+end
+
+--==================================================
+-- Base address resolution
+--==================================================
+
+---Resolve and cache the GameStatus struct base address.
+---@param forceRescan boolean|nil
+---@return integer|nil address, string|nil error
+local function resolveBase(forceRescan)
+    if baseAddress ~= nil and not forceRescan then
+        return baseAddress
+    end
+
+    local addresses, err = Memory.resolveGameStatusBase()
+    if not addresses or #addresses == 0 then
+        return nil, err or "base_not_found"
+    end
+
+    baseAddress = addresses[1]
+    return baseAddress
+end
+
+M.resolveBase = resolveBase
+
+--==================================================
+-- Field lookup helpers
+--==================================================
+
+---@param id string
+---@return table|nil field, string|nil error
+local function lookupField(id)
+    local field = metadata[id]
+    if field == nil then
+        return nil, "unknown_field: " .. tostring(id)
+    end
+    return field
+end
+
+---@param field table
+---@return boolean known
+local function isOffsetKnown(field)
+    return field.offset ~= 0xBAAD
+end
+
+local function log(...)
+    if Nebula ~= nil and Nebula.log then
+        print("[Nebula.GameStatus]", ...)
+    end
+end
+
+---Produce a compact, human-readable description of a value for
+---logging. Boxed types (like BitMask) dump their entire internal
+---table via plain tostring(), which is noisy and useless in a log
+---line — this gives each type a chance to describe itself sensibly.
+---@param field table
+---@param value any
+---@return string
+local function describeValue(field, value)
+    if field.repeated and type(value) == "table" then
+        return string.format("[ %d element(s) of %s ]", #value, tostring(field.type))
+    end
+
+    if field.type == "BitMask" and type(value) == "table" then
+        local ok, hasMethod = pcall(function() return value.has end)
+        if ok and hasMethod then
+            local enum = resolveEnum(field.enum)
+            local active = {}
+            if enum then
+                for name in pairs(enum) do
+                    if value:has(name) then
+                        active[#active + 1] = name
+                    end
+                end
+                table.sort(active)
+            end
+            return string.format("{ %s }", table.concat(active, ", "))
+        end
+    end
+
+    return tostring(value)
+end
+
+--==================================================
+-- get()
+--==================================================
+
+---@param id string
+---@return any|nil value, string|nil error
+function M.get(id)
+    local field, fieldErr = lookupField(id)
+    if not field then
+        log("get failed:", fieldErr)
+        return nil, fieldErr
+    end
+
+    if field.type == "Object" then
+        return nil, "unsupported_type: Object fields are not yet readable (missing nested metadata)"
+    end
+
+    if not isOffsetKnown(field) then
+        return nil, "offset_unknown: " .. id
+    end
+
+    local base, baseErr = resolveBase()
+    if not base then
+        log("get failed, no base:", baseErr)
+        return nil, baseErr
+    end
+
+    if field.repeated then
+        local values, err = Repeated.get(base, field)
+        if values == nil and err then
+            log("get('" .. id .. "') failed:", err)
+        end
+        return values, err
+    end
+
+    local impl = Type.resolve(field.type)
+    if not impl then
+        return nil, "no_type_impl: " .. tostring(field.type)
+    end
+
+    local value, err = impl.get(base, field)
+    if value == nil and err then
+        log("get('" .. id .. "') failed:", err)
+    end
+    return value, err
+end
+
+--==================================================
+-- set() — returns a chainable operation object supporting
+-- :force() and :dry()
+--==================================================
+
+local SetOperation = {}
+SetOperation.__index = SetOperation
+
+local function performWrite(op)
+    local field, fieldErr = lookupField(op.id)
+    if not field then
+        log("set failed:", fieldErr)
+        return false, fieldErr
+    end
+
+    if field.type == "Object" then
+        return false, "unsupported_type: Object fields are not yet writable (missing nested metadata)"
+    end
+
+    if not isOffsetKnown(field) then
+        return false, "offset_unknown: " .. op.id
+    end
+
+    if DANGEROUS_FIELDS[op.id] and not op._forced then
+        return false, "dangerous_field_requires_force: " .. op.id
+    end
+
+    if op._dry then
+        log(string.format("[dry] would set '%s' = %s", op.id, describeValue(field, op.value)))
+        return true, nil
+    end
+
+    local base, baseErr = resolveBase()
+    if not base then
+        log("set failed, no base:", baseErr)
+        return false, baseErr
+    end
+
+    if field.repeated then
+        local ok, err = Repeated.set(base, field, op.value)
+        if not ok then
+            log("set('" .. op.id .. "') failed:", err)
+            return false, err or "write_failed"
+        end
+        log(string.format("set '%s' = %s", op.id, describeValue(field, op.value)))
+        return true, nil
+    end
+
+    local impl = Type.resolve(field.type)
+    if not impl then
+        return false, "no_type_impl: " .. tostring(field.type)
+    end
+
+    local ok = impl.set(base, field, op.value)
+    if not ok then
+        log("set('" .. op.id .. "') failed")
+        return false, "write_failed"
+    end
+
+    log(string.format("set '%s' = %s", op.id, describeValue(field, op.value)))
+    return true, nil
+end
+
+---Mark this operation as forced, bypassing the dangerous-field guard,
+---then execute it. Returns (ok, err).
+function SetOperation:force()
+    self._forced = true
+    return performWrite(self)
+end
+
+---Mark this operation as a dry run: validates everything (field
+---exists, offset known, force requirement) but never touches memory.
+---Returns (ok, err).
+function SetOperation:dry()
+    self._dry = true
+    return performWrite(self)
+end
+
+-- Calling set() executes immediately (no modifier required), while
+-- still returning the chainable object so :force()/:dry() remain
+-- usable for staged/conditional execution.
+setmetatable(SetOperation, {
+    __call = function(cls, id, value)
+        local self = setmetatable({ id = id, value = value, _forced = false, _dry = false }, cls)
+        local ok, err = performWrite(self)
+        self._ok, self._err = ok, err
+        return self
+    end
+})
+
+---@param id string
+---@param value any
+---@return table operation @ chainable; already executed unless dangerous-field guard blocked it
+function M.set(id, value)
+    return SetOperation(id, value)
+end
+
+--==================================================
+-- add() / sub() — numeric read-modify-write shortcuts
+--==================================================
+-- Nebula.GameStatus.add("coins", 1000)  ==  set("coins", get("coins") + 1000)
+-- Nebula.GameStatus.sub("coins", 500)   ==  set("coins", get("coins") - 500)
+--
+-- Only meaningful for numeric field types (Int32, Float,
+-- SafeInt32) — String, Bool, BitMask, Achievement, and repeated
+-- fields don't have a sensible "add" operation and are rejected
+-- with unsupported_operation rather than silently coercing.
+--
+-- Both go through the exact same SetOperation as set() (internally
+-- they just compute the new value and call M.set()), so :force()
+-- and :dry() work identically: Nebula.GameStatus.add("coins", 1000):dry().
+
+local NUMERIC_TYPES = {
+    Int32     = true,
+    Float     = true,
+    SafeInt32 = true,
+}
+
+---@param id string
+---@param delta number
+---@param negate boolean
+---@return table operation @ chainable, same shape as set()'s return
+local function performArithmetic(id, delta, negate)
+    local field, fieldErr = lookupField(id)
+    if not field then
+        log("add/sub failed:", fieldErr)
+        local self = setmetatable({ id = id, value = nil, _forced = false, _dry = false }, SetOperation)
+        self._ok, self._err = false, fieldErr
+        return self
+    end
+
+    if field.repeated or not NUMERIC_TYPES[field.type] then
+        log("add/sub failed: unsupported_operation for type " .. tostring(field.type))
+        local self = setmetatable({ id = id, value = nil, _forced = false, _dry = false }, SetOperation)
+        self._ok, self._err = false, "unsupported_operation: add/sub not valid for type " .. tostring(field.type)
+        return self
+    end
+
+    local current, getErr = M.get(id)
+    if current == nil then
+        log("add/sub failed, get() failed:", getErr)
+        local self = setmetatable({ id = id, value = nil, _forced = false, _dry = false }, SetOperation)
+        self._ok, self._err = false, getErr or "read_failed"
+        return self
+    end
+
+    local newValue = negate and (current - delta) or (current + delta)
+    return SetOperation(id, newValue)
+end
+
+---@param id string
+---@param delta number
+---@return table operation
+function M.add(id, delta)
+    return performArithmetic(id, delta, false)
+end
+
+---@param id string
+---@param delta number
+---@return table operation
+function M.sub(id, delta)
+    return performArithmetic(id, delta, true)
+end
+
+--==================================================
+-- has() — cheap existence check, no full decode
+--==================================================
+-- For pointer-backed fields (String, SafeInt32, message/repeated
+-- types), "exists" means the pointer at base+offset is non-null —
+-- this is a single Memory.deref(), far cheaper than a full get()
+-- when all you need to know is whether something's there.
+--
+-- Plain inline scalars (Int32, Bool, Float, BitMask) have no null
+-- state — they always "exist" once GameStatus itself is resolved —
+-- so has() for those just reflects whether the offset is known.
+--
+-- Note: this is field-level existence, distinct from BitMask's own
+-- boxed-value :has(flagName), which checks bit membership on an
+-- already-read value. Nebula.GameStatus.has("flags") asks "is the
+-- flags field itself present"; flags:has("IsPitCrew") asks "is
+-- this specific bit set" — different questions, kept separate.
+
+local POINTER_BACKED_TYPES = {
+    String      = true,
+    SafeInt32   = true,
+}
+
+---@param field table
+---@return boolean
+local function isPointerBackedType(field)
+    if field.repeated then
+        return true -- repeated fields are always pointer-backed containers
+    end
+    if POINTER_BACKED_TYPES[field.type] then
+        return true
+    end
+    -- Anything not a known inline scalar is assumed to be a
+    -- pointer-backed message/custom type.
+    local INLINE_SCALARS = { Int32 = true, Bool = true, Float = true, BitMask = true }
+    return not INLINE_SCALARS[field.type]
+end
+
+---@param id string
+---@return boolean|nil exists, string|nil error
+function M.has(id)
+    local field, fieldErr = lookupField(id)
+    if not field then
+        log("has failed:", fieldErr)
+        return nil, fieldErr
+    end
+
+    if field.type == "Object" then
+        return nil, "unsupported_type: Object fields are not yet checkable (missing nested metadata)"
+    end
+
+    if not isOffsetKnown(field) then
+        return nil, "offset_unknown: " .. id
+    end
+
+    if not isPointerBackedType(field) then
+        -- No null state for inline scalars — known offset means it exists.
+        return true, nil
+    end
+
+    local base, baseErr = resolveBase()
+    if not base then
+        log("has failed, no base:", baseErr)
+        return nil, baseErr
+    end
+
+    local ptr = Memory.read(base + field.offset, Memory.FLAGS.POINTER)
+    return ptr ~= nil and ptr ~= 0, nil
+end
+
+--==================================================
+-- meta() — read-only introspection
+--==================================================
+
+local MetaView = {}
+MetaView.__index = MetaView
+
+---For BitMask fields, read the live value and decode it into a
+---plain { FlagName = true/false, ... } table, so introspection
+---shows readable flag states instead of a raw bitmask type name.
+---Returns nil if the field isn't a readable BitMask right now
+---(offset unknown, base unresolved, or read failed).
+---@param base integer|nil
+---@param field table
+---@return table|nil flags
+local function decodeBitMaskFlags(base, field)
+    if field.type ~= "BitMask" or base == nil or not isOffsetKnown(field) then
+        return nil
+    end
+
+    local impl = Type.resolve("BitMask")
+    if not impl then
+        return nil
+    end
+
+    local ok, boxed = pcall(impl.get, base, field)
+    if not ok or boxed == nil then
+        return nil
+    end
+
+    local enum = resolveEnum(field.enum)
+    if not enum then
+        return nil
+    end
+
+    local decoded = {}
+    for name in pairs(enum) do
+        decoded[name] = boxed:has(name)
+    end
+
+    return decoded
+end
+
+---@param id string
+---@return table|nil metaView, string|nil error
+function M.meta(id)
+    local field, err = lookupField(id)
+    if not field then
+        return nil, err
+    end
+
+    local view = setmetatable({
+        name       = id,
+        type       = field.type,
+        offset     = field.offset,
+        repeated   = field.repeated,
+        risk       = DANGEROUS_FIELDS[id] and "high" or "low",
+        known      = isOffsetKnown(field),
+    }, MetaView)
+
+    if baseAddress ~= nil and isOffsetKnown(field) then
+        view.address = baseAddress + field.offset
+    else
+        view.address = nil
+    end
+
+    if field.type == "BitMask" then
+        view.flags = decodeBitMaskFlags(baseAddress, field)
+    end
+
+    return view
+end
+
+return M
+
+end
+
+__vfs['core/Memory.lua'] = function(...)
+--==================================================
+-- core/Memory.lua
+--==================================================
+-- Thin wrapper around GameGuardian's gg.getValues/gg.setValues.
+-- Every Type module and api/*.lua goes through this instead of
+-- calling gg.* directly. This is the only file allowed to know
+-- about gg.* flag numbers.
+
+local M = {}
+
+-- GG value-type flags used throughout Nebula.
+M.FLAGS = {
+    BYTE   = 1,
+    WORD   = 2,
+    INT32  = 4,
+    XOR    = 8,   -- unused/reserved
+    FLOAT  = 16,
+    INT64  = 32,  -- also used for pointers
+    DOUBLE = 64,
+}
+
+M.FLAGS.POINTER = M.FLAGS.INT64
+
+---Verbose, timed logging for every gg.* round-trip. Off by default
+---— gated by Nebula.verbose (separate from Nebula.log, which is
+---for api/GameStatus.lua's higher-level get/set/dry logging). Use
+---this to see where time is actually going: number of gg calls,
+---batch sizes, and per-call duration.
+local function vlog(label, count, startTime)
+    if Nebula ~= nil and Nebula.verbose then
+        local elapsedMs = (os.clock() - startTime) * 1000
+        print(string.format("[Nebula.Memory] %-12s count=%-4d %.2fms", label, count, elapsedMs))
+    end
+end
+
+---Read a single value at an address with a given flag.
+---@param address integer
+---@param flags integer
+---@return any|nil value, string|nil error
+function M.read(address, flags)
+    if address == nil or address == 0 then
+        return nil, "nil_address"
+    end
+
+    local startTime = os.clock()
+    local ok, result = pcall(function()
+        return gg.getValues({ { address = address, flags = flags } })
+    end)
+    vlog("read", 1, startTime)
+
+    if not ok or type(result) ~= "table" or result[1] == nil then
+        return nil, "read_failed"
+    end
+
+    return result[1].value
+end
+
+---Read multiple {address, flags} pairs in one batched call.
+---@param specs table[] @ array of { address = int, flags = int }
+---@return table[]|nil results, string|nil error
+function M.readBatch(specs)
+    local startTime = os.clock()
+    local ok, result = pcall(function()
+        return gg.getValues(specs)
+    end)
+    vlog("readBatch", #specs, startTime)
+
+    if not ok or type(result) ~= "table" then
+        return nil, "read_failed"
+    end
+
+    return result
+end
+
+---Write a single value at an address with a given flag.
+---@param address integer
+---@param flags integer
+---@param value any
+---@return boolean ok
+function M.write(address, flags, value)
+    if address == nil or address == 0 then
+        return false
+    end
+
+    local startTime = os.clock()
+    local ok = pcall(function()
+        gg.setValues({ { address = address, flags = flags, value = value } })
+    end)
+    vlog("write", 1, startTime)
+
+    return ok
+end
+
+---Write multiple {address, flags, value} triples in one batched call.
+---@param specs table[]
+---@return boolean ok
+function M.writeBatch(specs)
+    local startTime = os.clock()
+    local ok = pcall(function()
+        gg.setValues(specs)
+    end)
+    vlog("writeBatch", #specs, startTime)
+
+    return ok
+end
+
+-- Max specs sent to gg.getValues/setValues in a single call.
+-- Even with header size/capacity sanity-checked (see
+-- core/Repeated.lua), a legitimately large repeated field could
+-- still produce a batch big enough to strain GG's IPC layer in one
+-- shot. Chunking keeps every individual gg.* call small and
+-- predictable regardless of how many specs the caller has.
+M.MAX_BATCH_SIZE = 256
+
+---Read multiple {address, flags} pairs, transparently chunked into
+---calls of at most M.MAX_BATCH_SIZE each. Result order matches
+---input order.
+---@param specs table[]
+---@return table[]|nil results, string|nil error
+function M.readBatchChunked(specs)
+    if #specs <= M.MAX_BATCH_SIZE then
+        return M.readBatch(specs)
+    end
+
+    local results = {}
+    for i = 1, #specs, M.MAX_BATCH_SIZE do
+        local chunk = {}
+        for j = i, math.min(i + M.MAX_BATCH_SIZE - 1, #specs) do
+            chunk[#chunk + 1] = specs[j]
+        end
+
+        local chunkResults, err = M.readBatch(chunk)
+        if not chunkResults then
+            return nil, err
+        end
+
+        for _, r in ipairs(chunkResults) do
+            results[#results + 1] = r
+        end
+    end
+
+    return results
+end
+
+---Write multiple {address, flags, value} triples, transparently
+---chunked into calls of at most M.MAX_BATCH_SIZE each.
+---@param specs table[]
+---@return boolean ok
+function M.writeBatchChunked(specs)
+    if #specs <= M.MAX_BATCH_SIZE then
+        return M.writeBatch(specs)
+    end
+
+    for i = 1, #specs, M.MAX_BATCH_SIZE do
+        local chunk = {}
+        for j = i, math.min(i + M.MAX_BATCH_SIZE - 1, #specs) do
+            chunk[#chunk + 1] = specs[j]
+        end
+
+        if not M.writeBatch(chunk) then
+            return false
+        end
+    end
+
+    return true
+end
+
+---Follow a pointer field: read the pointer value stored at
+---`baseAddress + offset`, returning the address it points to.
+---@param baseAddress integer
+---@param offset integer
+---@return integer|nil pointer, string|nil error
+function M.deref(baseAddress, offset)
+    local ptr, err = M.read(baseAddress + offset, M.FLAGS.POINTER)
+    if ptr == nil or ptr == 0 then
+        return nil, err or "null_pointer"
+    end
+    return ptr
+end
+
+--==================================================
+-- Base address resolution
+--==================================================
+-- Finds the live GameStatus struct in memory by locating the
+-- "startup_count" string constant, then walking a fixed chain of
+-- pointer derefs to reach the real struct base:
+--
+--   hit            = AOB match address of "startup_count"
+--   ptr            = read(hit + 0x1F, INT64)     -- object holding the string
+--   ver            = read(ptr + 0x10, INT32)     -- vtable/version marker
+--   typePtr        = read(ptr + 0x80, INT64)     -- pointer to the actual struct
+--   base           = read(typePtr, INT32).address -- the struct's own address
+--
+-- The scan must run per-region (gg.REGION_C_ALLOC / gg.REGION_OTHER)
+-- — searching all regions at once misses the hit in some game
+-- states, which is why this previously failed.
+--
+-- Result is cached per script session — see api/GameStatus.lua's
+-- resolveBase(), which owns the cache. This function always does
+-- a fresh scan; callers are responsible for caching.
+
+local SIGNATURE_HEX = "73 74 61 72 74 75 70 5F 63 6F 75 6E 74" -- "startup_count"
+local VALID_VTABLE_MARKERS = {
+    [65792]    = true,
+    [65793]    = true,
+    [16843008] = true,
+    [16843009] = true,
+}
+
+M.SEARCH_REGIONS = { gg.REGION_C_ALLOC, gg.REGION_OTHER }
+
+local function regionName(region)
+    if region == gg.REGION_C_ALLOC then return "C_ALLOC" end
+    if region == gg.REGION_OTHER then return "OTHER" end
+    return tostring(region)
+end
+
+---Scan a single region for GameStatus struct base address hits.
+---@param region integer
+---@return integer[] found
+local function scanRegion(region)
+    local found = {}
+
+    gg.clearResults()
+    gg.setRanges(region)
+    gg.searchNumber("h " .. SIGNATURE_HEX, 1)
+    gg.refineNumber("h 73", 1)
+
+    local results = gg.getResults(gg.getResultsCount())
+    gg.clearResults()
+
+    if not results or #results == 0 then
+        return found
+    end
+
+    for _, hit in ipairs(results) do
+        local ptr = M.read(hit.address + 0x1F, M.FLAGS.INT64)
+
+        if ptr ~= nil and ptr ~= 0 then
+            -- Sanity-check: a real pointer should be in a plausible
+            -- memory range. Values outside this look like ASCII text
+            -- from false-positive AOB matches inside string literals.
+            if ptr >= 0x10000 and ptr <= 0x7FFFFFFFFFFF then
+                local ver = M.read(ptr + 0x10, M.FLAGS.INT32)
+                if ver ~= nil and VALID_VTABLE_MARKERS[ver] then
+                    local typePtr = M.read(ptr + 0x80, M.FLAGS.INT64)
+                    if typePtr ~= nil and typePtr ~= 0 then
+                        -- Reference reads a value AT typePtr just to confirm
+                        -- the address is live/readable, then uses typePtr
+                        -- itself (not the value read) as the resolved base.
+                        local probe = M.read(typePtr, M.FLAGS.INT32)
+                        if probe ~= nil then
+                            table.insert(found, typePtr)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return found
+end
+
+---Scan process memory for the GameStatus struct base address.
+---Expensive — call once per session and cache the result.
+---@return integer[]|nil addresses, string|nil error
+function M.resolveGameStatusBase()
+    for _, region in ipairs(M.SEARCH_REGIONS) do
+        local ok, found = pcall(scanRegion, region)
+        if ok and found and #found > 0 then
+            return found
+        end
+    end
+
+    return nil, "no_valid_matches"
+end
+
+return M
+end
+
+__vfs['core/Repeated.lua'] = function(...)
+--==================================================
+-- core/Repeated.lua
+--==================================================
+-- Walks a repeated-field container and dispatches each element to
+-- its declared element type (field.type). This is not registered
+-- in core/Type.lua's registry — it's infrastructure that
+-- api/GameStatus.lua calls directly whenever field.repeated == true,
+-- using field.type to know what each element actually is.
+--
+-- Container layout:
+--
+--   base + field.offset = ptr        (this address IS the container
+--                                     header start — not a pointer
+--                                     that needs an extra deref)
+--
+--   ptr + 0x0   arrayPtr   (int64, pointer to backing array)
+--   ptr + 0x8   size       (int32, live element count)
+--   ptr + 0xC   capacity   (int32, allocated slot count)
+--   ptr + 0x10  allocSlots (int32, next-pow2 of size — derived by
+--                           the allocator's growth strategy, not
+--                           authoritative; capacity is the number
+--                           Nebula trusts for bounds-checking)
+--
+-- Element slots, 8 bytes apart, `size` of them:
+--
+--   arrayPtr + 0x0, 0x8, 0x10, 0x18, ...
+--
+-- Each slot's *contents* depend on the element kind:
+--
+--   - Message/custom types (e.g. Achievement, SafeInt32,
+--     DriverCustomization): the slot holds a POINTER to the
+--     element's struct. The element type's get/set(base, field)
+--     is called with that pointer as `base` and an offset of 0,
+--     since the whole struct starts right there.
+--
+--   - Direct scalars (Int32, Bool, Float): the slot holds the
+--     value inline at scalar width, not behind another pointer.
+--     (Not yet exercised by a real field — Achievement is the
+--     first test case and it's message-typed — but the branch
+--     exists so scalar repeated fields don't silently misread.)
+
+local Memory = loadModule("core/Memory.lua")
+local Type   = loadModule("core/Type.lua")
+
+local M = {}
+
+local ELEMENT_STRIDE = 0x8
+
+-- Types whose array slots hold a pointer to the element (rather
+-- than the element's value inline). Message/custom types always
+-- fall in here; scalar types are read/written inline.
+local POINTER_ELEMENT_TYPES = {
+    SafeInt32 = true,
+}
+
+---@param elementType string
+---@return boolean
+local function isPointerElement(elementType)
+    if POINTER_ELEMENT_TYPES[elementType] then
+        return true
+    end
+    -- Anything not a known inline scalar type is assumed to be a
+    -- message/custom type, which is always pointer-indirected.
+    local INLINE_SCALARS = { Int32 = true, Bool = true, Float = true, String = true, BitMask = true }
+    return not INLINE_SCALARS[elementType]
+end
+
+-- Hard ceiling on element count Nebula will ever trust from a
+-- container header. A real HCR2 repeated field (achievements,
+-- owned vehicles, etc.) is nowhere near this size — if size or
+-- capacity comes back larger than this, the header read landed on
+-- garbage (wrong offset, misaligned pointer, uninitialized memory)
+-- and must be rejected rather than acted on. Without this, a
+-- corrupted size can turn into a multi-gigabyte table allocation
+-- attempt before a single gg.* call even happens, which is enough
+-- to OOM both the Lua VM and GG's host process.
+local MAX_TRUSTED_ELEMENT_COUNT = 100000
+
+---Read the container header at base+offset. The container header
+---lives directly at that address — base+offset IS the header
+---start, not a pointer to be dereferenced again. (Earlier versions
+---of this function called Memory.deref() here, which added a
+---spurious extra pointer hop and read size/capacity from the wrong
+---location entirely.)
+---@param baseAddress integer
+---@param field table
+---@return table|nil header, string|nil error
+local function readHeader(baseAddress, field)
+    local ptr = baseAddress + field.offset
+
+    local fields, readErr = Memory.readBatch({
+        { address = ptr,        flags = Memory.FLAGS.INT64 }, -- arrayPtr
+        { address = ptr + 0x8,  flags = Memory.FLAGS.INT32 }, -- size
+        { address = ptr + 0xC,  flags = Memory.FLAGS.INT32 }, -- capacity
+    })
+
+    if not fields then
+        return nil, readErr
+    end
+
+    local arrayPtr = fields[1] and fields[1].value
+    local size     = fields[2] and fields[2].value
+    local capacity = fields[3] and fields[3].value
+
+    if arrayPtr == nil or size == nil or capacity == nil then
+        return nil, "header_read_failed"
+    end
+
+    -- Reject negative values outright — a valid size/capacity is
+    -- never negative; a negative int32 here means we're reading
+    -- garbage (wrong struct, misaligned offset, sign-bit garbage).
+    if size < 0 or capacity < 0 then
+        return nil, "header_negative_size_or_capacity"
+    end
+
+    -- Reject anything past the trusted ceiling before it's used to
+    -- drive any loop or table allocation.
+    if size > MAX_TRUSTED_ELEMENT_COUNT or capacity > MAX_TRUSTED_ELEMENT_COUNT then
+        return nil, string.format(
+            "header_size_out_of_bounds (size=%d capacity=%d, max=%d) — offset likely wrong",
+            size, capacity, MAX_TRUSTED_ELEMENT_COUNT)
+    end
+
+    -- A well-formed container never has more live elements than
+    -- allocated capacity. If it does, the header is corrupted.
+    if size > capacity then
+        return nil, string.format("header_size_exceeds_capacity (size=%d capacity=%d)", size, capacity)
+    end
+
+    return { containerPtr = ptr, arrayPtr = arrayPtr, size = size, capacity = capacity }
+end
+
+--==================================================
+-- get()
+--==================================================
+
+---Read every element of a repeated field into a plain Lua array.
+---@param baseAddress integer
+---@param field table @ { offset, type = <element type>, repeated = true, ... }
+---@return table|nil values, string|nil error
+function M.get(baseAddress, field)
+    local header, err = readHeader(baseAddress, field)
+    if not header then
+        return nil, err
+    end
+
+    if header.size <= 0 then
+        return {}, nil
+    end
+
+    if header.arrayPtr == 0 then
+        return nil, "null_array_ptr"
+    end
+
+    local impl = Type.resolve(field.type)
+    if not impl then
+        return nil, "no_type_impl: " .. tostring(field.type)
+    end
+
+    local pointerElements = isPointerElement(field.type)
+    local values = {}
+    local count = 0
+
+    if pointerElements then
+        -- Read all slot pointers in one batch first.
+        local slotSpecs = {}
+        for i = 0, header.size - 1 do
+            slotSpecs[i + 1] = { address = header.arrayPtr + i * ELEMENT_STRIDE, flags = Memory.FLAGS.INT64 }
+        end
+
+        local slots, slotErr = Memory.readBatchChunked(slotSpecs)
+        if not slots then
+            return nil, slotErr
+        end
+
+        if impl.specs and impl.parse then
+            -- Batch-optimized path: collect every element's field
+            -- specs into one cross-element readBatch, then hand
+            -- each element's slice to impl.parse(). Cuts N
+            -- round-trips (one get() per element) down to 1.
+            local elementPtrs = {}
+            local allSpecs = {}
+            local specCounts = {}
+
+            for i = 1, header.size do
+                local elementPtr = slots[i] and slots[i].value
+                elementPtrs[i] = elementPtr
+                if elementPtr and elementPtr ~= 0 then
+                    local elSpecs = impl.specs(elementPtr)
+                    specCounts[i] = #elSpecs
+                    for _, spec in ipairs(elSpecs) do
+                        allSpecs[#allSpecs + 1] = spec
+                    end
+                else
+                    specCounts[i] = 0
+                end
+            end
+
+            local allResults, batchErr = Memory.readBatchChunked(allSpecs)
+            if not allResults then
+                return nil, batchErr
+            end
+
+            local cursor = 1
+            for i = 1, header.size do
+                count = count + 1
+                local n = specCounts[i]
+                if elementPtrs[i] and elementPtrs[i] ~= 0 and n > 0 then
+                    local slice = {}
+                    for j = 1, n do
+                        slice[j] = allResults[cursor + j - 1]
+                    end
+                    cursor = cursor + n
+                    local value, elErr = impl.parse(slice)
+                    values[count] = value == nil and false or value
+                else
+                    values[count] = false
+                end
+            end
+        else
+            -- Fallback: element type doesn't implement the batch
+            -- interface, dispatch one get() call per element.
+            for i = 1, header.size do
+                local elementPtr = slots[i] and slots[i].value
+                count = count + 1
+                if elementPtr and elementPtr ~= 0 then
+                    local value, elErr = impl.get(elementPtr, { offset = 0, type = field.type, enum = field.enum })
+                    values[count] = value == nil and false or value
+                else
+                    values[count] = false
+                end
+            end
+        end
+    else
+        -- Inline scalar elements: dispatch directly against the
+        -- array base using a synthetic per-index offset.
+        for i = 0, header.size - 1 do
+            local value = impl.get(header.arrayPtr, { offset = i * ELEMENT_STRIDE, type = field.type, enum = field.enum })
+            count = count + 1
+            values[count] = value == nil and false or value
+        end
+    end
+
+    return values, nil
+end
+
+--==================================================
+-- set()
+--==================================================
+
+---Write a plain Lua array back into a repeated field. Only
+-- overwrites existing slots (0..#values-1) and updates `size` —
+-- never grows the backing array or allocates new element structs,
+-- since Nebula doesn't own the game's allocator. Fails cleanly if
+-- the new array is larger than the container's capacity.
+---@param baseAddress integer
+---@param field table
+---@param values table @ plain Lua array of element values
+---@return boolean ok, string|nil error
+function M.set(baseAddress, field, values)
+    if type(values) ~= "table" then
+        return false, "value_not_array"
+    end
+
+    local header, err = readHeader(baseAddress, field)
+    if not header then
+        return false, err
+    end
+
+    local newSize = #values
+
+    if newSize > header.capacity then
+        return false, "capacity_exceeded"
+    end
+
+    if header.arrayPtr == 0 then
+        return false, "null_array_ptr"
+    end
+
+    local impl = Type.resolve(field.type)
+    if not impl then
+        return false, "no_type_impl: " .. tostring(field.type)
+    end
+
+    local pointerElements = isPointerElement(field.type)
+
+    if pointerElements then
+        -- Existing slot pointers must already point at live element
+        -- structs to write into — Nebula can't allocate new ones.
+        local slotSpecs = {}
+        for i = 0, newSize - 1 do
+            slotSpecs[i + 1] = { address = header.arrayPtr + i * ELEMENT_STRIDE, flags = Memory.FLAGS.INT64 }
+        end
+
+        local slots, slotErr = Memory.readBatchChunked(slotSpecs)
+        if not slots then
+            return false, slotErr
+        end
+
+        for i = 1, newSize do
+            local elementPtr = slots[i] and slots[i].value
+            if elementPtr == nil or elementPtr == 0 then
+                return false, string.format("null_element_ptr_at_index_%d", i - 1)
+            end
+            local ok = impl.set(elementPtr, { offset = 0, type = field.type, enum = field.enum }, values[i])
+            if not ok then
+                return false, string.format("element_write_failed_at_index_%d", i - 1)
+            end
+        end
+    else
+        for i = 1, newSize do
+            local ok = impl.set(header.arrayPtr, { offset = (i - 1) * ELEMENT_STRIDE, type = field.type, enum = field.enum }, values[i])
+            if not ok then
+                return false, string.format("element_write_failed_at_index_%d", i - 1)
+            end
+        end
+    end
+
+    local sizeOk = Memory.write(header.containerPtr + 0x8, Memory.FLAGS.INT32, newSize)
+    if not sizeOk then
+        return false, "size_write_failed"
+    end
+
+    return true, nil
+end
+
+return M
+
+end
+
+__vfs['core/Type.lua'] = function(...)
+--==================================================
+-- core/Type.lua
+--==================================================
+-- Central registry mapping metadata `type` strings to their
+-- get/set implementation modules. Adding a new type = add a file
+-- to core/types/ and register it here.
+
+local M = {}
+
+local registry = {
+    Int32       = loadModule("core/types/Int32.lua"),
+    SafeInt32   = loadModule("core/types/SafeInt32.lua"),
+    Bool        = loadModule("core/types/Bool.lua"),
+    Float       = loadModule("core/types/Float.lua"),
+    String      = loadModule("core/types/String.lua"),
+    BitMask     = loadModule("core/types/BitMask.lua"),
+    Achievement = loadModule("core/types/Achievement.lua"),
+}
+
+---@param typeName string
+---@return table|nil implementation
+function M.resolve(typeName)
+    return registry[typeName]
+end
+
+---Register a new type implementation at runtime (for modules that
+---want to extend Nebula without editing this file).
+---@param typeName string
+---@param implementation table @ must expose get(base, field) and set(base, field, value)
+function M.register(typeName, implementation)
+    registry[typeName] = implementation
+end
+
+return M
+
+end
+
+__vfs['core/types/Achievement.lua'] = function(...)
+--==================================================
+-- core/types/Achievement.lua
+--==================================================
+-- message Achievement {
+--   required int32 id = 1;
+--   required bool unlocked = 2;
+--   optional int32 steps = 3;
+-- }
+--
+-- Struct layout (fields relative to the element's own base — for
+-- repeated fields, that's the element pointer itself, offset 0):
+--
+--   base + 0x18  id        (int32)
+--   base + 0x1C  unlocked  (bool, 1 byte)
+--   base + 0x20  steps     (int32)
+--
+-- Unlike scalar/String/SafeInt32 type modules, this one doesn't
+-- use field.offset directly — `field` here is the synthetic
+-- { offset = 0, type = "Achievement" } passed in by
+-- core/Repeated.lua, since each array slot already points straight
+-- at the element struct. get()/set() return/accept a plain Lua
+-- table: { id = ..., unlocked = ..., steps = ... }.
+--
+-- Also implements the optional M.specs(base)/M.parse(results) pair
+-- so core/Repeated.lua can batch every element's reads into one
+-- cross-element gg.getValues call instead of one call per element.
+-- See core/Repeated.lua's batchGetElements() for how this is used.
+
+local Memory = loadModule("core/Memory.lua")
+
+local M = {}
+
+local FIELD_ID_OFF       = 0x18
+local FIELD_UNLOCKED_OFF = 0x1C
+local FIELD_STEPS_OFF    = 0x20
+
+---Optional batch-read descriptor: given an element base, describe
+---the {address, flags} specs needed to read this element, in a
+---fixed order, without doing any actual I/O. core/Repeated.lua
+---uses this (when present) to collect every element's field specs
+---into one big cross-element readBatch instead of calling get()
+---once per element — cutting N round-trips down to 1 for an
+---N-element array. Falls back to per-element M.get() when a type
+---doesn't implement this.
+---@param base integer
+---@return table specs @ array of { address, flags }
+function M.specs(base)
+    return {
+        { address = base + FIELD_ID_OFF,       flags = Memory.FLAGS.INT32 },
+        { address = base + FIELD_UNLOCKED_OFF, flags = Memory.FLAGS.BYTE },
+        { address = base + FIELD_STEPS_OFF,    flags = Memory.FLAGS.INT32 },
+    }
+end
+
+---Parse a slice of already-fetched readBatch results (in the same
+---order M.specs() described them) into this type's value shape.
+---Used alongside M.specs() for batch reads; independent of get().
+---@param results table @ slice of gg.getValues-style results, same order as specs()
+---@return table|nil value, string|nil error
+function M.parse(results)
+    local id       = results[1] and results[1].value
+    local unlocked = results[2] and results[2].value
+    local steps    = results[3] and results[3].value
+
+    if id == nil or unlocked == nil then
+        return nil, "read_failed"
+    end
+
+    return {
+        id       = id,
+        unlocked = (unlocked & 0xFF) ~= 0,
+        steps    = steps,
+    }
+end
+
+---@param base integer @ pointer to the Achievement struct itself
+---@param field table @ unused offset (struct starts at base+0), kept for interface consistency
+---@return table|nil value, string|nil error
+function M.get(base, field)
+    local fields, err = Memory.readBatch(M.specs(base))
+    if not fields then
+        return nil, err
+    end
+    return M.parse(fields)
+end
+
+---@param base integer @ pointer to the Achievement struct itself
+---@param field table @ unused offset, kept for interface consistency
+---@param value table @ { id, unlocked, steps }
+---@return boolean ok
+function M.set(base, field, value)
+    if type(value) ~= "table" then
+        return false
+    end
+
+    local writes = {}
+
+    if value.id ~= nil then
+        writes[#writes + 1] = { address = base + FIELD_ID_OFF, flags = Memory.FLAGS.INT32, value = math.floor(value.id) }
+    end
+
+    if value.unlocked ~= nil then
+        writes[#writes + 1] = { address = base + FIELD_UNLOCKED_OFF, flags = Memory.FLAGS.BYTE, value = value.unlocked and 1 or 0 }
+    end
+
+    if value.steps ~= nil then
+        writes[#writes + 1] = { address = base + FIELD_STEPS_OFF, flags = Memory.FLAGS.INT32, value = math.floor(value.steps) }
+    end
+
+    if #writes == 0 then
+        return false
+    end
+
+    return Memory.writeBatch(writes)
+end
+
+return M
+
+end
+
+__vfs['core/types/BitMask.lua'] = function(...)
+local BitMask = {}
+BitMask.__index = BitMask
+
+local function loadEnum(field)
+    if type(field.enum) == "table" then
+        return field.enum
+    end
+
+    return loadModule("metadata/enums/" .. field.enum .. ".lua")
+end
+
+function BitMask.new(value, enum)
+    return setmetatable({
+        _value = value or 0,
+        _enum = enum,
+    }, BitMask)
+end
+
+function BitMask:value()
+    return self._value
+end
+
+function BitMask:has(name)
+    local flag = self._enum[name]
+    assert(flag, ("Unknown flag '%s'"):format(name))
+
+    return (self._value & flag) ~= 0
+end
+
+function BitMask:enable(name)
+    local flag = self._enum[name]
+    assert(flag, ("Unknown flag '%s'"):format(name))
+
+    self._value = self._value | flag
+    return self
+end
+
+function BitMask:disable(name)
+    local flag = self._enum[name]
+    assert(flag, ("Unknown flag '%s'"):format(name))
+
+    self._value = self._value & (~flag)
+    return self
+end
+
+function BitMask:toggle(name)
+    local flag = self._enum[name]
+    assert(flag, ("Unknown flag '%s'"):format(name))
+
+    self._value = self._value ~ flag
+    return self
+end
+
+function BitMask.get(base, field)
+    local Int32 = Nebula.Type.resolve("Int32")
+    local value = Int32.get(base, field)
+    return BitMask.new(value, loadEnum(field))
+end
+
+function BitMask.set(base, field, value)
+    if getmetatable(value) == BitMask then
+        value = value:value()
+    end
+
+    local Int32 = Nebula.Type.resolve("Int32")
+    return Int32.set(base, field, value)
+end
+
+return BitMask
+end
+
+__vfs['core/types/Bool.lua'] = function(...)
+--==================================================
+-- core/types/Bool.lua
+--==================================================
+-- Single-byte boolean field (proto2 `bool`). Stored as 0x00/0x01.
+
+local Memory = loadModule("core/Memory.lua")
+
+local M = {}
+
+---@param baseAddress integer
+---@param field table
+---@return boolean|nil value, string|nil error
+function M.get(baseAddress, field)
+    local raw, err = Memory.read(baseAddress + field.offset, Memory.FLAGS.BYTE)
+    if raw == nil then
+        return nil, err
+    end
+    return raw ~= 0
+end
+
+---@param baseAddress integer
+---@param field table
+---@param value boolean
+---@return boolean ok
+function M.set(baseAddress, field, value)
+    if type(value) ~= "boolean" then
+        return false
+    end
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.BYTE, value and 1 or 0)
+end
+
+return M
+
+end
+
+__vfs['core/types/Float.lua'] = function(...)
+--==================================================
+-- core/types/Float.lua
+--==================================================
+-- 4-byte IEEE-754 float field.
+
+local Memory = loadModule("core/Memory.lua")
+
+local M = {}
+
+---@param baseAddress integer
+---@param field table
+---@return number|nil value, string|nil error
+function M.get(baseAddress, field)
+    return Memory.read(baseAddress + field.offset, Memory.FLAGS.FLOAT)
+end
+
+---@param baseAddress integer
+---@param field table
+---@param value number
+---@return boolean ok
+function M.set(baseAddress, field, value)
+    if type(value) ~= "number" then
+        return false
+    end
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.FLOAT, value)
+end
+
+return M
+
+end
+
+__vfs['core/types/Int32.lua'] = function(...)
+--==================================================
+-- core/types/Int32.lua
+--==================================================
+-- Plain 4-byte signed integer field. No indirection, no protobuf
+-- wrapper — just a direct read/write at baseAddress + offset.
+
+local Memory = loadModule("core/Memory.lua")
+
+local M = {}
+
+---@param baseAddress integer
+---@param field table @ { offset, ... } from metadata
+---@return integer|nil value, string|nil error
+function M.get(baseAddress, field)
+    return Memory.read(baseAddress + field.offset, Memory.FLAGS.INT32)
+end
+
+---@param baseAddress integer
+---@param field table
+---@param value integer
+---@return boolean ok
+function M.set(baseAddress, field, value)
+    if type(value) ~= "number" then
+        return false
+    end
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.INT32, math.floor(value))
+end
+
+return M
+
+end
+
+__vfs['core/types/Object.lua'] = function(...)
+
+end
+
+__vfs['core/types/SafeInt32.lua'] = function(...)
+--==================================================
+-- core/types/SafeInt32.lua
+--==================================================
+-- Type-dispatcher wrapper around the SafeInt32 protobuf struct.
+--
+-- IMPORTANT: unlike Int32/Bool/Float, a SafeInt32 *field* on
+-- GameStatus (e.g. currentWinStreak, safeCoins) holds a POINTER at
+-- baseAddress + field.offset. The struct itself lives at that
+-- pointer, laid out as:
+--   ptr + 0x18  safeValue  (int32)
+--   ptr + 0x1C  key        (int32)
+--   ptr + 0x20  checksum   (int32)
+--   ptr + 0x24  keyChecksum (int32)
+--
+-- Confirmed from account.lua M.changeWinStreak, which reads
+-- currentPtr/bestPtr via flags=32 (pointer) at the field offset,
+-- then writes the four sub-fields at ptr+0x18..0x24.
+--
+-- The static XOR key is a single account-wide int32 living at
+-- GameStatus.safeIntStaticKey (base + 0x6AC, per changeWinStreak).
+-- Individual metadata fields don't need to declare
+-- staticKeyOffset — it's fixed and resolved internally.
+
+local Memory = loadModule("core/Memory.lua")
+
+---@class SafeInt32
+SafeInt32 = setmetatable({
+    safeValue   = 0;
+    key         = 0;
+    checksum    = 0;
+    keyChecksum = 0;
+    __index = function(t, k) return SafeInt32[k] end
+}, {
+    __call = function(cls, ...) return cls:__new() end
+}
+)
+
+IntUtils = {}
+
+function IntUtils:toInt32(x)
+    if x >= 0x80000000 then
+        return x - 0x100000000
+    end
+
+    return x
+end
+
+---@param value integer @hash of safeInt.key and staticKey or safeInt.safeValue
+---@return integer
+function SafeInt32:__hash(value)
+    local x = value & 0xFFFFFFFF
+    x = x ~ (x >> 16)
+    x = (x * 0x045d9f3b) & 0xFFFFFFFF
+    x = x ~ (x >> 16)
+    x = (x * 0x045d9f3b) & 0xFFFFFFFF
+    x = x ~ (x >> 16)
+    return IntUtils:toInt32(x)
+end
+
+function SafeInt32:__new()
+    local instance = setmetatable({}, self);
+    return instance;
+end
+
+---@param staticKey integer
+---@return integer
+function SafeInt32:decode(staticKey)
+    return staticKey ~ self.safeValue ~ self.key
+end
+
+---@param staticKey integer
+---@param value integer
+---@param key integer
+---@return integer
+function SafeInt32:encode(staticKey, value, key)
+    return staticKey ~ value ~ key;
+end
+
+---@param safeInt table (class:SafeInt32)
+---@return nil
+function SafeInt32:set(safeInt)
+    self.safeValue   = safeInt.safeValue;
+    self.key         = safeInt.key;
+    self.checksum    = safeInt.checksum;
+    self.keyChecksum = safeInt.keyChecksum;
+end
+
+---@param self table
+---@param value integer?
+---@param staticKey integer
+---@return table (class:SafeInt32)
+function SafeInt32:new(value, staticKey)
+    if value ~= nil then
+        local safeInt = SafeInt32:__new();
+        safeInt.key         = math.random(0, 0x7fffffff);
+        safeInt.safeValue   = self:encode(staticKey, value, safeInt.key);
+        safeInt.checksum    = self:__hash(value ~ safeInt.key);
+        safeInt.keyChecksum = self:__hash(staticKey ~ safeInt.key);
+
+        return safeInt;
+    end
+
+    local safeInt = SafeInt32:__new();
+    value               = math.random(0, 0x7fffffff);
+    safeInt.key         = math.random(0, 0x7fffffff);
+    safeInt.safeValue   = self:encode(staticKey, value, safeInt.key);
+    safeInt.checksum    = self:__hash(value ~ safeInt.key);
+    safeInt.keyChecksum = self:__hash(staticKey ~ safeInt.key);
+
+    return safeInt;
+end
+
+---@param value integer
+---@param staticKey integer
+---@return nil
+function SafeInt32:update(value, staticKey)
+    local safeInt = self:new(value, staticKey);
+    self:set(safeInt);
+end
+
+---@param staticKey integer
+---@return boolean
+function SafeInt32:isValid(staticKey)
+
+    if self.checksum ~= self:__hash(self:decode(staticKey) ~ self.key) then
+        return false;
+    end
+
+    if self.keyChecksum ~= self:__hash(staticKey ~ self.key) then
+        return false;
+    end
+
+    return true;
+end
+
+---@param value integer
+---@param staticKey integer
+---@return boolean
+function SafeInt32:verifyAndCheckSafeValue(value, staticKey)
+
+    local decoded = self:decode(staticKey);
+
+    if value ~= decoded then
+        return false;
+    end
+
+    if self:isValid(staticKey) then
+
+        if self.checksum ~= self:__hash(value ~ self.key) then
+            return false;
+        end
+
+        return true;
+    end
+
+    return false;
+end
+
+
+---@param staticKey integer
+---@return nil
+function SafeInt32:print(staticKey)
+    local safeInt = string.format("[\t\n\x20safeValue=(%d);\n key=(%d);\n checksum=(%d);\n keyChecksum=(%d);\t\n]", IntUtils:toInt32(self.safeValue), IntUtils:toInt32(self.key), IntUtils:toInt32(self.checksum), IntUtils:toInt32(self.keyChecksum));
+    local info    = string.format("[\t\n\x20decoded=(%d);\n staticKey=(%d);\n isValid=(%s)\t\n]", IntUtils:toInt32(self:decode(staticKey)), IntUtils:toInt32(staticKey), self:isValid(staticKey))
+    print(string.format("[SafeInt32::print] -> SafeInt : %s\n Info : %s\n", safeInt, info))
+end
+
+--==================================================
+-- Type dispatcher (Nebula-facing get/set)
+--==================================================
+
+local M = {}
+
+-- Sub-field byte offsets within the SafeInt32 struct, relative to
+-- the struct pointer (not the GameStatus base). Confirmed via
+-- account.lua M.changeWinStreak.
+local STRUCT_SAFEVALUE_OFF   = 0x18
+local STRUCT_KEY_OFF         = 0x1C
+local STRUCT_CHECKSUM_OFF    = 0x20
+local STRUCT_KEYCHECKSUM_OFF = 0x24
+
+-- Fixed account-wide static key offset (base + this = safeIntStaticKey).
+local STATIC_KEY_OFFSET = 0x6AC
+
+---Resolve the account-wide static XOR key.
+---@param baseAddress integer
+---@return integer staticKey
+local function resolveStaticKey(baseAddress)
+    return Memory.read(baseAddress + STATIC_KEY_OFFSET, Memory.FLAGS.INT32) or 0
+end
+
+---Read the raw 4-field struct from the pointer target into a
+---SafeInt32 instance.
+---@param structPtr integer
+---@return table instance
+local function readStruct(structPtr)
+    local specs = {
+        { address = structPtr + STRUCT_SAFEVALUE_OFF,   flags = Memory.FLAGS.INT32 },
+        { address = structPtr + STRUCT_KEY_OFF,         flags = Memory.FLAGS.INT32 },
+        { address = structPtr + STRUCT_CHECKSUM_OFF,    flags = Memory.FLAGS.INT32 },
+        { address = structPtr + STRUCT_KEYCHECKSUM_OFF, flags = Memory.FLAGS.INT32 },
+    }
+    local results = Memory.readBatch(specs)
+    local instance = SafeInt32:__new()
+    if results then
+        instance.safeValue   = results[1] and results[1].value or 0
+        instance.key         = results[2] and results[2].value or 0
+        instance.checksum    = results[3] and results[3].value or 0
+        instance.keyChecksum = results[4] and results[4].value or 0
+    end
+    return instance
+end
+
+---@param baseAddress integer
+---@param field table @ { offset, ... }
+---@return integer|nil value, string|nil error
+function M.get(baseAddress, field)
+    local structPtr, err = Memory.deref(baseAddress, field.offset)
+    if not structPtr then
+        return nil, err
+    end
+
+    local instance = readStruct(structPtr)
+    local staticKey = resolveStaticKey(baseAddress)
+
+    if not instance:isValid(staticKey) then
+        return nil, "checksum_invalid"
+    end
+
+    return instance:decode(staticKey)
+end
+
+---@param baseAddress integer
+---@param field table
+---@param value integer
+---@return boolean ok
+function M.set(baseAddress, field, value)
+    if type(value) ~= "number" then
+        return false
+    end
+
+    local structPtr, err = Memory.deref(baseAddress, field.offset)
+    if not structPtr then
+        return false
+    end
+
+    local staticKey = resolveStaticKey(baseAddress)
+    local instance = SafeInt32:new(math.floor(value), staticKey)
+
+    return Memory.writeBatch({
+        { address = structPtr + STRUCT_SAFEVALUE_OFF,   flags = Memory.FLAGS.INT32, value = instance.safeValue },
+        { address = structPtr + STRUCT_KEY_OFF,         flags = Memory.FLAGS.INT32, value = instance.key },
+        { address = structPtr + STRUCT_CHECKSUM_OFF,    flags = Memory.FLAGS.INT32, value = instance.checksum },
+        { address = structPtr + STRUCT_KEYCHECKSUM_OFF, flags = Memory.FLAGS.INT32, value = instance.keyChecksum },
+    })
+end
+
+return M
+
+end
+
+__vfs['core/types/String.lua'] = function(...)
+--==================================================
+-- core/types/String.lua
+--==================================================
+-- Java-string-backed field. baseAddress + offset holds a POINTER
+-- to a string object. Two on-disk encodings exist depending on
+-- string length:
+--
+-- INLINE (short strings, fits in 6 dwords / 24 bytes incl. the
+-- length byte):
+--   ptr+0x0        byteCount*2 (length byte)
+--   ptr+0x1..      raw chars, packed directly after the length byte
+--
+-- LONG (indirected — used once the inline layout would overflow):
+--   ptr+0x0        header, expected in range [9, 99]
+--   ptr+0x4        MUST be 0
+--   ptr+0x8        length (raw char count, NOT multiplied)
+--   ptr+0xC        MUST be 0
+--   ptr+0x10       pointer to the actual char data
+--
+-- Reference: account.lua M.changeName for the inline write path;
+-- the long-form layout and header-value dispatch (header == 49 in
+-- that particular reference) come from vehicle part-name reads
+-- elsewhere in the codebase.
+--
+-- No byte-length cap here. changeName's 12-byte limit is a
+-- display-name UI constraint, not a property of strings in
+-- general — Nebula doesn't decide that for callers.
+
+local Memory = loadModule("core/Memory.lua")
+
+local M = {}
+
+-- Inline form budget: 6 dwords total, length byte included.
+local INLINE_MAX_BYTES = 6 * 4 -- 24
+
+-- Long-form header sanity range.
+local LONG_HEADER_MIN = 9
+local LONG_HEADER_MAX = 99
+
+---GG returns byte reads as signed (-128..127). string.char needs
+---0..255, so mask back to unsigned before building the string.
+---@param signed integer
+---@return integer
+local function toUnsignedByte(signed)
+    return signed & 0xFF
+end
+
+---Read `count` raw bytes starting at `addr` and decode them into a
+---Lua string. Handles the signed-byte masking for every byte.
+---@param addr integer
+---@param count integer
+---@return string|nil value, string|nil error
+local function readRawBytes(addr, count)
+    if count <= 0 then
+        return "", nil
+    end
+
+    local specs = {}
+    for i = 0, count - 1 do
+        specs[i + 1] = { address = addr + i, flags = Memory.FLAGS.BYTE }
+    end
+
+    local results, err = Memory.readBatch(specs)
+    if not results then
+        return nil, err
+    end
+
+    local bytes = {}
+    for i = 1, count do
+        local raw = results[i] and results[i].value or 0
+        bytes[i] = toUnsignedByte(raw)
+    end
+
+    return string.char(table.unpack(bytes))
+end
+
+---Read the inline-form string at `ptr` (length byte at ptr+0x0,
+---chars at ptr+0x1..).
+---@param ptr integer
+---@return string|nil value, string|nil error
+local function readInline(ptr)
+    local lenRaw, lenErr = Memory.read(ptr, Memory.FLAGS.BYTE)
+    if lenRaw == nil then
+        return nil, lenErr
+    end
+
+    local byteCount = math.floor(toUnsignedByte(lenRaw) / 2)
+    return readRawBytes(ptr + 1, byteCount)
+end
+
+---Read the long-form (indirected) string at `ptr`, per the layout
+---documented above. Validates the header/reserved fields before
+---trusting the data.
+---@param ptr integer
+---@return string|nil value, string|nil error
+local function readLong(ptr)
+    local fields, err = Memory.readBatch({
+        { address = ptr,        flags = Memory.FLAGS.INT32 }, -- header
+        { address = ptr + 0x4,  flags = Memory.FLAGS.INT32 }, -- must be 0
+        { address = ptr + 0x8,  flags = Memory.FLAGS.INT32 }, -- length
+        { address = ptr + 0xC,  flags = Memory.FLAGS.INT32 }, -- must be 0
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 }, -- char data ptr
+    })
+
+    if not fields then
+        return nil, err
+    end
+
+    local header   = fields[1] and fields[1].value
+    local reserved1 = fields[2] and fields[2].value
+    local length   = fields[3] and fields[3].value
+    local reserved2 = fields[4] and fields[4].value
+    local dataPtr  = fields[5] and fields[5].value
+
+    if header == nil or header < LONG_HEADER_MIN or header > LONG_HEADER_MAX then
+        return nil, "long_header_invalid"
+    end
+    if reserved1 ~= 0 or reserved2 ~= 0 then
+        return nil, "long_reserved_nonzero"
+    end
+    if dataPtr == nil or dataPtr == 0 then
+        return nil, "long_dataptr_null"
+    end
+    if length == nil or length < 0 then
+        return nil, "long_length_invalid"
+    end
+
+    return readRawBytes(dataPtr, length)
+end
+
+---Read the string at baseAddress+offset by following its pointer.
+---Auto-detects inline vs long-form encoding: tries the long-form
+---header check first (cheap, self-validating), falls back to
+---inline if that check fails.
+---@param baseAddress integer
+---@param field table
+---@return string|nil value, string|nil error
+function M.get(baseAddress, field)
+    local ptr, err = Memory.deref(baseAddress, field.offset)
+    if not ptr then
+        return nil, err
+    end
+
+    local longVal, longErr = readLong(ptr)
+    if longVal ~= nil then
+        return longVal
+    end
+
+    return readInline(ptr)
+end
+
+---Write the inline form at `ptr`: length byte at ptr+0x0, raw
+---bytes following at ptr+0x1..
+---@param ptr integer
+---@param nameBytes integer[]
+---@param byteCount integer
+---@return boolean ok
+local function writeInline(ptr, nameBytes, byteCount)
+    local writes = { { address = ptr, flags = Memory.FLAGS.BYTE, value = byteCount * 2 } }
+    for i = 1, #nameBytes do
+        writes[#writes + 1] = { address = ptr + i, flags = Memory.FLAGS.BYTE, value = nameBytes[i] }
+    end
+    return Memory.writeBatch(writes)
+end
+
+---Write the long form at `ptr`: header/reserved/length fields plus
+---raw bytes at the existing dataPtr (the long form's char buffer is
+---not relocated/resized here — only its content and length fields
+---are updated).
+---@param ptr integer
+---@param nameBytes integer[]
+---@param byteCount integer
+---@return boolean ok
+local function writeLong(ptr, nameBytes, byteCount)
+    local fields, err = Memory.readBatch({
+        { address = ptr,        flags = Memory.FLAGS.INT32 }, -- header
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 }, -- char data ptr
+    })
+    if not fields then
+        return false
+    end
+
+    local header  = fields[1] and fields[1].value
+    local dataPtr = fields[2] and fields[2].value
+
+    if header == nil or header < LONG_HEADER_MIN or header > LONG_HEADER_MAX then
+        return false -- not actually a valid long-form string object
+    end
+    if dataPtr == nil or dataPtr == 0 then
+        return false
+    end
+
+    local writes = {
+        { address = ptr + 0x8, flags = Memory.FLAGS.INT32, value = byteCount },
+    }
+    for i = 1, #nameBytes do
+        writes[#writes + 1] = { address = dataPtr + (i - 1), flags = Memory.FLAGS.BYTE, value = nameBytes[i] }
+    end
+
+    return Memory.writeBatch(writes)
+end
+
+---Write a string at baseAddress+offset. No length cap — the caller
+---(or a higher-level field constraint, e.g. UI display limits) is
+---responsible for validating length before calling this.
+---
+---Encoding is chosen automatically: if the encoded content
+---(length byte included) fits within the inline budget (6 dwords /
+---24 bytes), the inline form is used; otherwise the long
+---(indirected) form is used.
+---@param baseAddress integer
+---@param field table
+---@param value string
+---@return boolean ok
+function M.set(baseAddress, field, value)
+    if type(value) ~= "string" then
+        return false
+    end
+
+    local ptr, err = Memory.deref(baseAddress, field.offset)
+    if not ptr then
+        return false
+    end
+
+    local nameBytes = {}
+    local byteCount = 0
+
+    for _, code in utf8.codes(value) do
+        local encoded = utf8.char(code)
+        local bytes = { encoded:byte(1, -1) }
+        for _, b in ipairs(bytes) do
+            table.insert(nameBytes, b)
+            byteCount = byteCount + 1
+        end
+    end
+
+    -- +1 accounts for the inline form's length byte occupying part
+    -- of the 6-dword budget alongside the character bytes.
+    if byteCount + 1 <= INLINE_MAX_BYTES then
+        return writeInline(ptr, nameBytes, byteCount)
+    end
+
+    return writeLong(ptr, nameBytes, byteCount)
+end
+
+return M
+
+end
+
+__vfs['metadata/GameStatus.lua'] = function(...)
+--==================================================
+-- metadata/GameStatus.lua
+--==================================================
+-- Field table for the top-level GameStatus proto2 message.
+-- Sourced from descriptor.proto (field numbers / proto types)
+-- cross-referenced with known offsets from the legacy flat
+-- GameStatus.lua and account.lua ops.
+--
+-- offset = 0xBAAD means the offset is NOT YET KNOWN. Do not
+-- trust these fields until the placeholder is replaced by a
+-- verified static offset.
+--
+-- type = "Object" marks repeated/message fields that need
+-- their own nested metadata + Object type before Nebula can
+-- read/write them structurally. api/GameStatus.lua rejects
+-- get/set for these until Object.lua exists.
+--
+-- SafeInt32 fields: `offset` points to a POINTER to the
+-- struct (not an inline struct). The static XOR key is
+-- fixed account-wide at safeIntStaticKey and resolved
+-- internally by core/types/SafeInt32.lua — no per-field
+-- staticKeyOffset needed.
+
+return {
+    ["playerId"] = {
+        offset = 0x30,
+        repeated = false,
+        type = "String"
+    },
+    ["playerName"] = {
+        offset = 0x38,
+        repeated = false,
+        type = "String"
+    },
+    ["flag"] = {
+        offset = 0x40,
+        repeated = false,
+        type = "String"
+    },
+    ["coins"] = {
+        offset = 0x48,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalCoinsEarned"] = {
+        offset = 0x4C,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalNeckFlips"] = {
+        offset = 0x50,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalBackFlips"] = {
+        offset = 0x54,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalFlips"] = {
+        offset = 0x58,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalFuelCanistersCollected"] = {
+        offset = 0x5C,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalCoinsCollected"] = {
+        offset = 0x60,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalDistance"] = {
+        offset = 0x64,
+        repeated = false,
+        type = "Float"
+    },
+    ["totalPlayTime"] = {
+        offset = 0x68,
+        repeated = false,
+        type = "Float"
+    },
+    ["lastRaceTimestamp"] = {
+        offset = 0x6C,
+        repeated = false,
+        type = "Float"
+    },
+    ["completedMissions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MissionStatus
+    ["activeLevelMissions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MissionStatusMap
+    ["qualifyBests"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- QualifyTime
+    ["vehicleStatus"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- VehicleStatus
+    ["totalChampionshipPoints"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["currentDailyBestPoints"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["dailyBestPoints"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- RacePoints
+    ["tournamentRaceBests"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- LeaderboardItemData
+    ["activeTournaments"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- TournamentPlayerStatus
+    ["diamonds"] = {
+        offset = 0x120,
+        repeated = false,
+        type = "Int32"
+    },
+    ["ladderPoints"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["playerXp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["dailyMissionsFilledTimeStamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["dailyMissionChangesFilledTimeStamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["availableDailyMissionChanges"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["completedDailyMissions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MissionStatus
+    ["activeDailyMissions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MissionStatus
+    ["driver"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    }, -- DriverCustomization
+    ["levelStars"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- StringIntMap
+    ["unlocks"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- Unlock
+    ["chips"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalAirtime"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalWheelieTime"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalRacesFinished"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["myDivisions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- StringIntMap
+    ["selectedLevel"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["WCRank"] = {
+        offset = 0x1CC,
+        repeated = false,
+        type = "Float"
+    },
+    ["ownedWorlds"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["AllowedLevelTier"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalDistanceStarts"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalRaceStarts"] = {
+        offset = 0x238,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalRaceVictories"] = {
+        offset = 0x1F4,
+        repeated = false,
+        type = "Int32"
+    },
+    ["rewardManagerStatus"] = {
+        offset = 0x350,
+        repeated = false,
+        type = "Object"
+    },
+    ["maxWCRank"] = {
+        offset = 0x200,
+        repeated = false,
+        type = "Float"
+    },
+    ["nextFreeUpgradeTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["unlockedRaces"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["totalTime"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["unlockedVehicles"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["totalGemsEarned"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["recentChallenges"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["achievements"] = {
+        offset = 0x258,
+        repeated = true,
+        type = "Achievement"
+    },
+    ["totalCupVictories"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["cloudSaveVersion"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },  -- NOTE: was 0x540, but live test returned -1179343104 (implausible for a version counter). Reverted to unverified pending re-check.
+    ["ratingsAsked"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["ratingEventCounter"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["tutorialState"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalCupsFinished"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["adFree"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["purchasedSpecialOffers"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["teamId"] = {
+        offset = 0x2A0,
+        repeated = false,
+        type = "String"
+    },
+    ["activeFriendlyRaces"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- FriendlyRace
+    ["cheater"] = {
+        offset = 0x3DD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["currentCupId"] = {
+        offset = 0x2C0,
+        repeated = false,
+        type = "String"
+    },
+    ["deviceSignature"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["deviceHash"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["currentSpecialEventId"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["contentVersion"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["seasonStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- SeasonStatus
+    ["purchasedIaps"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- IapPurchaseEvent
+    ["acsPlayerGuid"] = {
+        offset = 0x2C8,
+        repeated = false,
+        type = "String"
+    },
+    ["challengesWon"] = {
+        offset = 0x304,
+        repeated = false,
+        type = "Int32"
+    },
+    ["featuredChallengesWon"] = {
+        offset = 0x310,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["nameChanges"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["nextFreeTuningPartUpgradeTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["activeEventStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- EventStatus
+    ["flags"] = {
+        offset = 0x328,
+        repeated = false,
+        type = "BitMask",
+        enum = "GameStatusFlag"
+    },
+    ["ownedVehicles"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["nextVehicleChestTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["vehicleChestsPurchased"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["gachaNewVehicleCounter"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["purchasedPopupOffers"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["activePopupOffer"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["activePopupOfferEndTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["expiredPopupOffers"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["pendingChests"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- PendingChest
+    ["libHash"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["vipStatus"] = {
+        offset = 0x3A8,
+        repeated = false,
+        type = "Object"
+    },
+    ["totalEventsJoined"] = {
+        offset = 0x3B0,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalEventPoints"] = {
+        offset = 0x3B4,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalEventRaces"] = {
+        offset = 0x3B8,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalEarnedTickets"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalSpentTickets"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["device"] = {
+        offset = 0x3C0,
+        repeated = false,
+        type = "String"
+    },
+    ["os"] = {
+        offset = 0x3D0,
+        repeated = false,
+        type = "String"
+    },
+    ["totalEventRacesWon"] = {
+        offset = 0x3CC,
+        repeated = false,
+        type = "Int32"
+    },
+    ["rentedVehicles"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- RentalStatus
+    ["unlockedWorlds"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["segmentId"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["playerSegments"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["checkinReward"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- CheckinReward
+    ["seasonRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["totalSeasonRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["bestSeasonRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["currentSeasonId"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["totalEventRaceStarts"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["createTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["deals"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- DealStatus
+    ["scrap"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["scrapperStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- ScrapperStatus
+    ["totalScrapEarned"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["oldSeasons"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- SeasonStatus
+    ["targetedAdsConsent"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["acceptedEulaVersion"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["activePopupOffers"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- ActivePopupOffer
+    ["activeTeamEventStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- EventStatus
+    ["teamStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- TeamStatus
+    ["specialTickets"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalEarnedSpecialTickets"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["totalSpentSpecialTickets"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["kickedTeamStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- KickedTeamStatus
+    ["teamEventOfferShown"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["weeklyEventOfferShown"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["playerNameApprovalState"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["distanceTickets"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- DistanceTicket
+    ["previousEventStatuses"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- EventStatus
+    ["garagePower"] = {
+        offset = 0x4F4,
+        repeated = false,
+        type = "Int32"
+    },
+    ["premiumWCUnlocked"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["receivedWCRewards"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["animatedWCRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["adventurerRank"] = {
+        offset = 0x538,
+        repeated = false,
+        type = "Int32"
+    },  -- NOTE: proto type is float, legacy metadata had Int32 -- verify before use
+    ["receivedAdventurerRewards"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated int32, needs array support
+    ["secret"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["animatedAdventurerRank"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Float"
+    },
+    ["banData"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- BanData
+    ["banReviewed"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["teamSeasonStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- TeamSeasonStatus
+    ["nonRewardedTeamSeasons"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["activeDailyBonusTasks"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- DailyTask
+    ["activeDailyTasks"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- DailyTask
+    ["nextDailyTaskTimeStamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["nextDailyTaskRerollTimeStamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["dailyTaskRerollsRemaining"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["shownGDPRVersion"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["dailyTaskRerollsWithVideoRemaining"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["pendingofferid"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["pendingOfferIds"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- IapPurchaseEvent
+    ["dailyTaskRefillsRemaining"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated int32, needs array support
+    ["currencies"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- Currency
+    ["publishedLevels"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["featuredChallenges"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- FeaturedChallenge
+    ["featuredChallengeIndex"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["nextFreeFeaturedChallengeTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["lastPlayerNameChangedTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["firstPlayerNameChange"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["distanceCollectibles"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- DistanceCollectibleStatus
+    ["activeCommunityEventStatus"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- EventStatus
+    ["currentPublicLevels"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["unlockedEditorThemes"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+    ["FSHomeProfileID"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["home"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- Home
+    ["ownedHomeProps"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- HomeCosmeticsOwnership
+    ["ownedHomeBackgrounds"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- HomeCosmeticsOwnership
+    ["megaAdChestRewards"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MegaAdChestRewardStatus
+    ["activeLeagueTasks"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- LeagueTask
+    ["communityEvent"] = {
+        offset = 0x6E8,
+        repeated = false,
+        type = "Object"
+    },
+    ["masteryBonusXp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeIntStaticKey"] = {
+        offset = 0x6AC,
+        repeated = false,
+        type = "Int32"
+    },
+    ["adFreeEndTimestamp"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeCoins"] = {
+        offset = 0x728,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeDiamonds"] = {
+        offset = 0x730,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeScrap"] = {
+        offset = 0x738,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["megaAdChestMultiplier"] = {
+        offset = 0x740,
+        repeated = false,
+        type = "Int32"
+    },
+    ["safeUnlocks"] = {
+        offset = 0x748,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeUnlockedVehicles"] = {
+        offset = 0x750,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeOwnedVehicles"] = {
+        offset = 0x758,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["safeOwnedWorlds"] = {
+        offset = 0x760,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["currentWinStreak"] = {
+        offset = 0x768,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["bestWinStreak"] = {
+        offset = 0x770,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["pendingWinStreakRestore"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["rankedCupOngoing"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["rankedCupVehicle"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["supportHmac"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["megaAdChestProgress"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- MegaAdChestProgress
+    ["signatureChallengeId"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "String"
+    },
+    ["activeTutorialVersion"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["adviews"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- AdViewsMap
+    ["premiumTierWCUnlocked"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["premiumProgressWCClaimed"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Bool"
+    },
+    ["currentGachaProgress"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- CurrentGachaProgress
+    ["claimedResearchRewardAmount"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "SafeInt32"
+    },
+    ["claimedResearchDonationAmount"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "SafeInt32"
+    },
+    ["currentFriendEvent"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Object"
+    },  -- CurrentFriendEvent
+    ["teamDonationTrack"] = {
+        offset = 0xBAAD,
+        repeated = false,
+        type = "Int32"
+    },
+    ["displayedInfoPopups"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated int32, needs array support
+    ["teamSupportChestTransactions"] = {
+        offset = 0xBAAD,
+        repeated = true,
+        type = "Object"
+    },  -- repeated string, needs array support
+}
+
+end
+
+__vfs['metadata/enums/GameStatusFlag.lua'] = function(...)
+---@class GameStatusFlag
+return {
+    EventModeUnlocked          = 0x000001,
+    TooMuchCoins               = 0x000002,
+    TooMuchGems                = 0x000004,
+    InvalidLibHash             = 0x000008,
+    IsPitCrew                  = 0x000010,
+    IapHacker                  = 0x000020,
+    RootedAndroid              = 0x000040,
+    MemoryHacker               = 0x000080,
+    ManuallyBanned             = 0x000100,
+    TeamModeUnlocked           = 0x000200,
+    AutoClicker                = 0x000400,
+    EmulatorDetected           = 0x000800,
+    DebuggerDetected           = 0x001000,
+    HookingDetected            = 0x002000,
+    InstrumentationDetected    = 0x004000,
+    ChecksumFailed             = 0x008000,
+    SignatureCheckFailed       = 0x010000,
+    VirtualizationDetected     = 0x020000,
+    AdventureModeUnlocked      = 0x040000,
+    CreativeModeUnlocked       = 0x080000,
+    CommunityEventUnlocked     = 0x100000,
+    HomeCustomizationUnlocked  = 0x200000,
+    SafeIntHacker              = 0x400000,
+    CurrencyTrackerHacker      = 0x800000,
+}
+end
+
+local scriptDir = gg.getFile():match("(.*/)" ) or ""
+script_dir = scriptDir  -- bridge for lang.lua and other modules
+
+function loadModule(name, soft)
+    local key = name:gsub("^%./", "")
+    if not key:match("%.lua$") then key = key .. ".lua" end
+    local vchunk = __vfs[key]
+    if vchunk then
+        -- Soft mode: run the module body guarded so a feature crash returns
+        -- nil, err instead of propagating (mirrors main.lua's loadModule).
+        if soft then
+            local results = table.pack(pcall(vchunk))
+            if not results[1] then return nil, results[2] end
+            return table.unpack(results, 2, results.n)
+        end
+        return vchunk()
+    end
+    local path = scriptDir .. name
+    local chunk, err = loadfile(path)
+    if not chunk then
+        if soft then return nil, err end
+        gg.alert("VFS miss: " .. name .. "\n" .. tostring(err))
+        os.exit()
+    end
+    if soft then
+        local results = table.pack(pcall(chunk))
+        if not results[1] then return nil, results[2] end
+        return table.unpack(results, 2, results.n)
+    end
+    return chunk()
+end
+
+
+-- ── MAIN ENTRYPOINT ──────────────────────────────────────────────────────
+
+
+--==================================================
+-- main.lua
+--==================================================
+-- Nebula SDK entry point.
+--
+-- Unpacked (dev) use: run this file directly with GG's script
+-- loader; loadModule() below resolves modules from disk relative
+-- to this file.
+--
+-- Packed (release) use: run `python bundle.py` from the project
+-- root. It strips the block below and replaces it with a
+-- VFS-aware loadModule() backed by an embedded __vfs table, so
+-- the exact same require-style calls in every module keep working
+-- with zero edits.
+
+--==================================================
+-- Nebula wiring
+--==================================================
+
+Nebula = Nebula or {}
+
+-- Global logging switch. No per-operation :log() — see api/GameStatus.lua.
+Nebula.log = false
+
+-- Verbose, timed logging for every gg.getValues/setValues round-trip
+-- — see core/Memory.lua's vlog(). Flip to true to see exactly where
+-- time is going: number of calls, batch sizes, per-call duration.
+Nebula.verbose = false
+
+Nebula.GameStatus = loadModule("api/GameStatus.lua")
+
+-- Expose the type registry and Memory layer for advanced/extension
+-- use (e.g. a consumer registering a custom type via
+-- Nebula.Type.register("MyType", impl)).
+Nebula.Type   = loadModule("core/Type.lua")
+Nebula.Memory = loadModule("core/Memory.lua")
+
+Nebula.VERSION = "0.1.0"
+
+--==================================================
+-- Test: read every field with a known offset
+--==================================================
+-- Uses Nebula.GameStatus.meta() to enumerate fields rather than
+-- hardcoding the list here, so this test stays correct as
+-- metadata/GameStatus.lua gains more verified offsets over time.
+
+local metadata = loadModule("metadata/GameStatus.lua")
+
+return Nebula
