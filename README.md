@@ -28,8 +28,7 @@ tables.
 
 Actively in development. Base address resolution, scalar types,
 bitmasks, repeated/array fields, and one message type (`Achievement`)
-are working and tested against a live game. Nested single-message
-(`Object`) support is still a placeholder.
+are working and tested against a live game. More objects will be added in the future.
 
 ---
 
@@ -376,9 +375,6 @@ required at runtime.
 
 ## Roadmap
 
-- [ ] `core/types/Object.lua` — nested single-message support
-      (`metadata/<MessageName>.lua` per message, offsets relative to
-      the sub-struct's own base pointer)
 - [ ] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
       `metadata/GameStatus.lua`
 - [ ] Additional message types beyond `Achievement`
