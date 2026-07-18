@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Nebula SDK</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg: #05060F;
+    --purple: #A855F7;
+    --violet: #8B5CF6;
+    --indigo: #6366F1;
+    --blue: #3B82F6;
+    --cyan: #06B6D4;
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #475569;
+    --border: rgba(139, 92, 246, 0.15);
+    --border-hover: rgba(139, 92, 246, 0.3);
+    --glass: rgba(10, 11, 24, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    position: fixed;
+    inset: 0;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#particle-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Navigation */
+.nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(5, 6, 15, 0.7);
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--purple), var(--cyan));
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 4s ease infinite;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.75rem;
+    list-style: none;
+}
+
+.nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.nav-links a:hover { color: var(--text-primary); }
+
+/* Hero */
+.hero {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    z-index: 1;
+}
+
+.hero-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(2.5rem, 10vw, 4.5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.03em;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+}
+
+.hero-title.visible { opacity: 1; }
+
+.hero-title .gradient-text {
+    background: linear-gradient(90deg, var(--purple), var(--violet), var(--indigo), var(--blue), var(--cyan), var(--purple));
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: movingLights 3s linear infinite;
+}
+
+@keyframes movingLights {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.hero-subtitle {
+    font-size: clamp(0.9rem, 2.5vw, 1.15rem);
+    color: var(--text-secondary);
+    max-width: 420px;
+    line-height: 1.65;
+    margin-bottom: 2rem;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 1s ease 0.3s, transform 1s ease 0.3s;
+}
+
+.hero-subtitle.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 260px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 1s ease 0.6s, transform 1s ease 0.6s;
+}
+
+.hero-actions.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.btn {
+    padding: 0.875rem 1.5rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    transition: transform 0.15s ease;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+    background: linear-gradient(90deg, var(--purple), var(--violet), var(--indigo), var(--blue), var(--cyan), var(--purple));
+    background-size: 300% 100%;
+    color: white;
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.3);
+    animation: movingLights 3s linear infinite;
+}
+
+.btn-secondary {
+    background: var(--glass);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.footer {
+    position: fixed;
+    bottom: 0.75rem;
+    left: 0; right: 0;
+    z-index: 1;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<nav class="nav">
+    <div class="nav-logo">Nebula SDK</div>
+    <ul class="nav-links">
+        <li><a href="https://github.com/vekendianorg/nebula" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/vekendianorg/nebula" target="_blank">Docs</a></li>
+    </ul>
+</nav>
+
+<section class="hero">
+    <h1 class="hero-title" id="hero-title">
+        <span class="gradient-text">Nebula SDK</span>
+    </h1>
+    <p class="hero-subtitle" id="hero-subtitle">
+        A metadata-driven memory SDK for Hill Climb Racing 2, built for GameGuardian's Lua environment.
+    </p>
+    <div class="hero-actions" id="hero-actions">
+        <a href="https://github.com/vekendianorg/nebula" target="_blank" rel="noopener" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/vekendianorg/nebula" target="_blank" rel="noopener" class="btn btn-secondary">Documentation</a>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>&copy; 2026 Vekendian Organization.</p>
+</footer>
+
+<script>
+(function() {
+    'use strict';
+
+    var canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    var width, height, dpr;
+    var particles = [];
+    var mouse = { x: -1000, y: -1000 };
+    var time = 0;
+    var running = true;
+    var rafId = null;
+    var lastTime = 0;
+
+    var CHARS = ['.', '·', '•', ',', '`', '·', '·', '.', '·', '·'];
+    var COLORS = ['#A855F7', '#8B5CF6', '#6366F1', '#3B82F6', '#06B6D4'];
+
+    var SHAPE_DURATION = 7000;
+    var shapeNames = ['nebula', 'wave', 'constellation', 'text', 'cube'];
+    var shapeIndex = 0;
+    var currentShape = 'nebula';
+    var lastShapeChange = 0;
+    var textTargets = [];
+    var shapeTargets = { nebula: [], wave: [], constellation: [], cube: [] };
+
+    function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        generateTargets();
+    }
+
+    function sampleText() {
+        var off = document.createElement('canvas');
+        var octx = off.getContext('2d');
+        var fontSize = Math.min(width * 0.11, 72);
+        off.width = Math.floor(width * dpr);
+        off.height = Math.floor(height * dpr);
+        octx.scale(dpr, dpr);
+        octx.fillStyle = '#fff';
+        octx.font = '700 ' + fontSize + 'px "JetBrains Mono", monospace';
+        octx.textAlign = 'center';
+        octx.textBaseline = 'middle';
+        var cy = height / 2;
+        octx.fillText('Nebula', width / 2, cy - fontSize * 0.55);
+        octx.fillText('SDK', width / 2, cy + fontSize * 0.55);
+        var imgData = octx.getImageData(0, 0, off.width, off.height).data;
+        var points = [];
+        var step = 3;
+        for (var y = 0; y < off.height; y += step) {
+            for (var x = 0; x < off.width; x += step) {
+                var idx = (y * off.width + x) * 4;
+                if (imgData[idx + 3] > 128) {
+                    points.push({ x: x / dpr, y: y / dpr });
+                }
+            }
+        }
+        return points;
+    }
+
+    function generateTargets() {
+        var cx = width / 2;
+        var cy = height / 2;
+        var scale = Math.min(width, height) / 800;
+
+        textTargets = sampleText();
+
+        shapeTargets.nebula = [];
+        for (var i = 0; i < 300; i++) {
+            var angle = Math.random() * Math.PI * 2;
+            var dist = Math.random() * 350 * scale;
+            shapeTargets.nebula.push({ x: cx + Math.cos(angle) * dist, y: cy + Math.sin(angle) * dist * 0.6 });
+        }
+
+        shapeTargets.wave = [];
+        for (var i = 0; i < 300; i++) {
+            var t = i / 300;
+            shapeTargets.wave.push({ x: cx + (t - 0.5) * 600 * scale, y: cy + Math.sin(t * Math.PI * 4) * 60 * scale });
+        }
+
+        shapeTargets.constellation = [];
+        var starPts = [
+            {x:-200,y:-100}, {x:-100,y:-150}, {x:0,y:-80},
+            {x:100,y:-140}, {x:200,y:-90}, {x:-150,y:0},
+            {x:-50,y:50}, {x:50,y:-20}, {x:150,y:40},
+            {x:-100,y:120}, {x:0,y:100}, {x:100,y:130}
+        ];
+        starPts.forEach(function(p) {
+            shapeTargets.constellation.push({ x: cx + p.x * scale, y: cy + p.y * scale });
+        });
+        for (var i = 0; i < 100; i++) {
+            var a = starPts[Math.floor(Math.random() * starPts.length)];
+            var b = starPts[Math.floor(Math.random() * starPts.length)];
+            var t = Math.random();
+            shapeTargets.constellation.push({ x: cx + (a.x + (b.x - a.x) * t) * scale, y: cy + (a.y + (b.y - a.y) * t) * scale });
+        }
+
+        shapeTargets.cube = [];
+        var cSize = 80 * scale;
+        var cVerts = [
+            {x:-1,y:-1,z:-1}, {x:1,y:-1,z:-1}, {x:1,y:1,z:-1}, {x:-1,y:1,z:-1},
+            {x:-1,y:-1,z:1}, {x:1,y:-1,z:1}, {x:1,y:1,z:1}, {x:-1,y:1,z:1}
+        ];
+        var edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+        edges.forEach(function(edge) {
+            var a = cVerts[edge[0]], b = cVerts[edge[1]];
+            for (var t = 0; t <= 1; t += 0.04) {
+                var x = a.x + (b.x-a.x)*t, y = a.y + (b.y-a.y)*t, z = a.z + (b.z-a.z)*t;
+                var proj = 300 / (300 + z * cSize * 0.5);
+                shapeTargets.cube.push({ x: cx + x*cSize*proj, y: cy + y*cSize*proj });
+            }
+        });
+    }
+
+    function initParticles() {
+        particles = [];
+        var count = Math.min(Math.floor((width * height) / 5000), 1200);
+        for (var i = 0; i < count; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: 0, vy: 0,
+                size: Math.random() * 1.8 + 0.8,
+                char: CHARS[Math.floor(Math.random() * CHARS.length)],
+                color: COLORS[Math.floor(Math.random() * COLORS.length)],
+                alpha: Math.random() * 0.4 + 0.15,
+                phase: Math.random() * Math.PI * 2,
+                targetIndex: i
+            });
+        }
+    }
+
+    function getTarget(p, shape) {
+        var targets = (shape === 'text') ? textTargets : (shapeTargets[shape] || shapeTargets.nebula);
+        if (!targets || targets.length === 0) return null;
+        return targets[p.targetIndex % targets.length];
+    }
+
+    function updateParticles(dt) {
+        time += dt * 0.001;
+        var now = Date.now();
+
+        if (now - lastShapeChange > SHAPE_DURATION) {
+            shapeIndex = (shapeIndex + 1) % shapeNames.length;
+            currentShape = shapeNames[shapeIndex];
+            lastShapeChange = now;
+        }
+
+        var isText = currentShape === 'text';
+        var attractStrength = isText ? 0.025 : 0.008;
+        var noiseStrength = isText ? 0.02 : 0.08;
+
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            var target = getTarget(p, currentShape);
+
+            p.x += Math.sin(time * 0.5 + p.phase) * noiseStrength;
+            p.y += Math.cos(time * 0.3 + p.phase * 0.7) * noiseStrength;
+
+            if (target) {
+                var dx = target.x - p.x;
+                var dy = target.y - p.y;
+                p.vx += dx * attractStrength;
+                p.vy += dy * attractStrength;
+            }
+
+            var mdx = p.x - mouse.x;
+            var mdy = p.y - mouse.y;
+            var mdist = Math.sqrt(mdx*mdx + mdy*mdy);
+            if (mdist < 120 && mdist > 0) {
+                var mf = (120 - mdist) / 120 * 0.8;
+                p.vx += (mdx / mdist) * mf;
+                p.vy += (mdy / mdist) * mf;
+            }
+
+            p.vx *= 0.92;
+            p.vy *= 0.92;
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (!isText) {
+                if (p.x < -30) p.x = width + 30;
+                if (p.x > width + 30) p.x = -30;
+                if (p.y < -30) p.y = height + 30;
+                if (p.y > height + 30) p.y = -30;
+            }
+
+            p.alpha = 0.2 + Math.sin(time * 0.5 + p.phase) * 0.12 + 0.1;
+        }
+    }
+
+    function drawParticles() {
+        ctx.clearRect(0, 0, width, height);
+
+        if (currentShape === 'constellation') {
+            ctx.strokeStyle = 'rgba(139, 92, 246, 0.06)';
+            ctx.lineWidth = 0.5;
+            for (var i = 0; i < particles.length; i++) {
+                for (var j = i + 1; j < particles.length; j++) {
+                    var dx = particles[i].x - particles[j].x;
+                    var dy = particles[i].y - particles[j].y;
+                    var dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 80) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            ctx.font = (p.size * 8) + 'px "JetBrains Mono", monospace';
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+            ctx.fillText(p.char, p.x, p.y);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    document.addEventListener('mousemove', function(e) {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+
+    function animate() {
+        rafId = requestAnimationFrame(animate);
+        if (!running) return;
+        var now = Date.now();
+        var dt = now - lastTime;
+        lastTime = now;
+        if (dt > 200) dt = 16;
+        if (dt < 0) dt = 16;
+        try {
+            updateParticles(dt);
+            drawParticles();
+        } catch (e) {
+            console.error('Particle error:', e);
+        }
+    }
+
+    function start() {
+        running = true;
+        lastTime = Date.now();
+        if (!rafId) animate();
+    }
+
+    function stop() {
+        running = false;
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        document.hidden ? stop() : start();
+    });
+    window.addEventListener('pageshow', start);
+    window.addEventListener('focus', start);
+    window.addEventListener('blur', stop);
+
+    setInterval(function() {
+        if (!document.hidden && Date.now() - lastTime > 1000) start();
+    }, 1000);
+
+    window.addEventListener('resize', function() {
+        resize();
+        initParticles();
+    });
+
+    resize();
+    initParticles();
+    lastShapeChange = Date.now();
+    start();
+
+    // Staggered hero reveal
+    setTimeout(function() { document.getElementById('hero-title').classList.add('visible'); }, 800);
+    setTimeout(function() { document.getElementById('hero-subtitle').classList.add('visible'); }, 1600);
+    setTimeout(function() { document.getElementById('hero-actions').classList.add('visible'); }, 2200);
+
+    // Lock zoom
+    document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+    document.addEventListener('touchmove', function(e) {
+        if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+    var lastTouchEnd = 0;
+    document.addEventListener('touchend', function(e) {
+        var now = Date.now();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
+    }, { passive: false });
+})();
+</script>
+</body>
+</html>
