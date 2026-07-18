@@ -18,12 +18,11 @@ tables.
 
 ## Philosophy
 
-- ✅ Open source
-- ✅ Compatibility first
-- ✅ Pure Lua + GG API (no LuaJava)
-- ✅ Headless (no UI)
-- ✅ Metadata-driven
-- ✅ SDK, not a cheat script
+- Open source
+- Compatibility first
+- Pure Lua + GG API (no LuaJava)
+- Headless (no UI)
+- Metadata-driven
 
 ## Status
 
@@ -31,6 +30,8 @@ Actively in development. Base address resolution, scalar types,
 bitmasks, repeated/array fields, and one message type (`Achievement`)
 are working and tested against a live game. Nested single-message
 (`Object`) support is still a placeholder.
+
+---
 
 ## Install
 
@@ -76,6 +77,8 @@ swap the version segment in the URL when you want to move to a newer
 release. The tradeoff versus local is an extra network round-trip on
 every script run, and the script silently breaking if the URL ever
 goes away or GitHub is unreachable.
+
+---
 
 ## Project structure
 
@@ -130,6 +133,8 @@ Nebula
 Adding a new field is a metadata edit. Adding a new scalar or message
 type is a new file in `core/types/`. Neither requires touching the
 public API.
+
+---
 
 ## Usage
 
@@ -297,6 +302,8 @@ own the game's allocator, so a write larger than `capacity` fails
 cleanly with `capacity_exceeded` rather than attempting anything
 unsafe.
 
+---
+
 ## Base address resolution
 
 `Memory.resolveGameStatusBase()` locates the live `GameStatus`
@@ -315,12 +322,16 @@ struct by:
 `api/GameStatus.lua` caches the result for the lifetime of the
 script session; the scan only runs once unless explicitly forced.
 
+---
+
 ## Dangerous fields
 
 Some fields are gated behind `:force()` to prevent accidental writes
 (currently just `cheater`). Calling `set()`, `add()`, or `sub()` on a
 dangerous field without `:force()` fails with
 `dangerous_field_requires_force`.
+
+---
 
 ## Verbose logging
 
@@ -342,6 +353,8 @@ round-trip, e.g.:
 Both default to `false`; `main.lua`'s field-test loop leaves them off
 unless you flip them on for debugging.
 
+---
+
 ## Packing for release
 
 ```
@@ -358,6 +371,8 @@ calls used in dev mode keep working unchanged in the packed output.
 This is what makes both [local](#local) and [cloud](#cloud) loading
 work from a single distributable file with no directory structure
 required at runtime.
+
+---
 
 ## Roadmap
 
