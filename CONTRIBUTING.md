@@ -1,7 +1,6 @@
 # Contributing to Nebula
 
-Thank you for your interest in contributing to Nebula. This document
-provides guidelines and instructions for contributing to the project.
+This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct
 
