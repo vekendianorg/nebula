@@ -1,4 +1,12 @@
 local BitMask = {}
+
+
+local function log(...)
+    if Nebula and Nebula.verbose then
+        print("[core.types.BitMask]", ...)
+    end
+end
+
 BitMask.__index = BitMask
 
 local function loadEnum(field)

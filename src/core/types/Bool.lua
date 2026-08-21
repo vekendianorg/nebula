@@ -7,6 +7,14 @@ local Memory = loadModule("core/Memory.lua")
 
 local M = {}
 
+local function log(...)
+    if Nebula and Nebula.verbose then
+        print("[core.types.Bool]", ...)
+    end
+end
+
+
+
 ---@param baseAddress integer
 ---@param field table
 ---@return boolean|nil value, string|nil error
@@ -26,7 +34,19 @@ function M.set(baseAddress, field, value)
     if type(value) ~= "boolean" then
         return false
     end
-    return Memory.write(baseAddress + field.offset, Memory.FLAGS.BYTE, value and 1 or 0)
+    function M.collectWrite(baseAddress, field, value, writes)
+    if type(value) == "boolean" then
+        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.BYTE, value = value and 1 or 0 }
+    end
+end
+
+return Memory.write(baseAddress + field.offset, Memory.FLAGS.BYTE, value and 1 or 0)
+end
+
+function M.collectWrite(baseAddress, field, value, writes)
+    if type(value) == "boolean" then
+        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.BYTE, value = value and 1 or 0 }
+    end
 end
 
 return M

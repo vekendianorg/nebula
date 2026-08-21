@@ -1,55 +1,24 @@
---==================================================
--- core/types/String.lua
---==================================================
--- Java-string-backed field. baseAddress + offset holds a POINTER
--- to a string object. Two on-disk encodings exist depending on
--- string length:
---
--- INLINE (short strings, fits in 6 dwords / 24 bytes incl. the
--- length byte):
---   ptr+0x0        byteCount*2 (length byte)
---   ptr+0x1..      raw chars, packed directly after the length byte
---
--- LONG (indirected — used once the inline layout would overflow):
---   ptr+0x0        header, expected in range [9, 99]
---   ptr+0x4        MUST be 0
---   ptr+0x8        length (raw char count, NOT multiplied)
---   ptr+0xC        MUST be 0
---   ptr+0x10       pointer to the actual char data
---
--- Reference: account.lua M.changeName for the inline write path;
--- the long-form layout and header-value dispatch (header == 49 in
--- that particular reference) come from vehicle part-name reads
--- elsewhere in the codebase.
---
--- No byte-length cap here. changeName's 12-byte limit is a
--- display-name UI constraint, not a property of strings in
--- general — Nebula doesn't decide that for callers.
-
 local Memory = loadModule("core/Memory.lua")
+local ZeroPage = loadModule("core/ZeroPage.lua")
 
 local M = {}
 
--- Inline form budget: 6 dwords total, length byte included.
-local INLINE_MAX_BYTES = 6 * 4 -- 24
+local function log(...)
+    if Nebula and Nebula.verbose then
+        print("[core.types.String]", ...)
+    end
+end
 
--- Long-form header sanity range.
+
+
+local INLINE_MAX_BYTES = 6 * 4
 local LONG_HEADER_MIN = 9
 local LONG_HEADER_MAX = 99
 
----GG returns byte reads as signed (-128..127). string.char needs
----0..255, so mask back to unsigned before building the string.
----@param signed integer
----@return integer
 local function toUnsignedByte(signed)
     return signed & 0xFF
 end
 
----Read `count` raw bytes starting at `addr` and decode them into a
----Lua string. Handles the signed-byte masking for every byte.
----@param addr integer
----@param count integer
----@return string|nil value, string|nil error
 local function readRawBytes(addr, count)
     if count <= 0 then
         return "", nil
@@ -74,10 +43,6 @@ local function readRawBytes(addr, count)
     return string.char(table.unpack(bytes))
 end
 
----Read the inline-form string at `ptr` (length byte at ptr+0x0,
----chars at ptr+0x1..).
----@param ptr integer
----@return string|nil value, string|nil error
 local function readInline(ptr)
     local lenRaw, lenErr = Memory.read(ptr, Memory.FLAGS.BYTE)
     if lenRaw == nil then
@@ -88,18 +53,13 @@ local function readInline(ptr)
     return readRawBytes(ptr + 1, byteCount)
 end
 
----Read the long-form (indirected) string at `ptr`, per the layout
----documented above. Validates the header/reserved fields before
----trusting the data.
----@param ptr integer
----@return string|nil value, string|nil error
 local function readLong(ptr)
     local fields, err = Memory.readBatch({
-        { address = ptr,        flags = Memory.FLAGS.INT32 }, -- header
-        { address = ptr + 0x4,  flags = Memory.FLAGS.INT32 }, -- must be 0
-        { address = ptr + 0x8,  flags = Memory.FLAGS.INT32 }, -- length
-        { address = ptr + 0xC,  flags = Memory.FLAGS.INT32 }, -- must be 0
-        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 }, -- char data ptr
+        { address = ptr,        flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x4,  flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x8,  flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0xC,  flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 },
     })
 
     if not fields then
@@ -128,33 +88,31 @@ local function readLong(ptr)
     return readRawBytes(dataPtr, length)
 end
 
----Read the string at baseAddress+offset by following its pointer.
----Auto-detects inline vs long-form encoding: tries the long-form
----header check first (cheap, self-validating), falls back to
----inline if that check fails.
----@param baseAddress integer
----@param field table
----@return string|nil value, string|nil error
+local function resolvePtr(baseAddress, field)
+    if field.indirect == false then
+        return baseAddress + field.offset
+    end
+    return Memory.deref(baseAddress, field.offset)
+end
+
 function M.get(baseAddress, field)
-    local ptr, err = Memory.deref(baseAddress, field.offset)
+    log(string.format("[get] base=0x%X offset=0x%X indirect=%s", baseAddress, field.offset, tostring(field.indirect)))
+    local ptr, err = resolvePtr(baseAddress, field)
     if not ptr then
         return nil, err
     end
+    log(string.format("[get] resolved ptr=0x%X", ptr))
 
     local longVal, longErr = readLong(ptr)
+    log(string.format("[get] readLong result=%s err=%s", tostring(longVal), tostring(longErr)))
     if longVal ~= nil then
         return longVal
     end
 
+    log(string.format("[get] falling back to readInline at ptr=0x%X", ptr))
     return readInline(ptr)
 end
 
----Write the inline form at `ptr`: length byte at ptr+0x0, raw
----bytes following at ptr+0x1..
----@param ptr integer
----@param nameBytes integer[]
----@param byteCount integer
----@return boolean ok
 local function writeInline(ptr, nameBytes, byteCount)
     local writes = { { address = ptr, flags = Memory.FLAGS.BYTE, value = byteCount * 2 } }
     for i = 1, #nameBytes do
@@ -163,84 +121,164 @@ local function writeInline(ptr, nameBytes, byteCount)
     return Memory.writeBatch(writes)
 end
 
----Write the long form at `ptr`: header/reserved/length fields plus
----raw bytes at the existing dataPtr (the long form's char buffer is
----not relocated/resized here — only its content and length fields
----are updated).
----@param ptr integer
----@param nameBytes integer[]
----@param byteCount integer
----@return boolean ok
+local function isLongForm(ptr)
+    local fields, err = Memory.readBatch({
+        { address = ptr,       flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x4, flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0xC, flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 },
+    })
+    if not fields then return false end
+    local header = fields[1] and fields[1].value
+    local r1 = fields[2] and fields[2].value
+    local r2 = fields[3] and fields[3].value
+    local dp = fields[4] and fields[4].value
+    if header == nil or header < LONG_HEADER_MIN or header > LONG_HEADER_MAX then return false end
+    if r1 ~= 0 or r2 ~= 0 then return false end
+    if dp == nil or dp == 0 then return false end
+    return true
+end
+
 local function writeLong(ptr, nameBytes, byteCount)
     local fields, err = Memory.readBatch({
-        { address = ptr,        flags = Memory.FLAGS.INT32 }, -- header
-        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 }, -- char data ptr
+        { address = ptr,       flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x4, flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0xC, flags = Memory.FLAGS.INT32 },
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64 },
     })
-    if not fields then
-        return false
-    end
 
-    local header  = fields[1] and fields[1].value
-    local dataPtr = fields[2] and fields[2].value
+    local header = fields and fields[1] and fields[1].value
+    local r1 = fields and fields[2] and fields[2].value
+    local r2 = fields and fields[3] and fields[3].value
+    local dataPtr = fields and fields[4] and fields[4].value
 
-    if header == nil or header < LONG_HEADER_MIN or header > LONG_HEADER_MAX then
-        return false -- not actually a valid long-form string object
-    end
-    if dataPtr == nil or dataPtr == 0 then
-        return false
+    local alreadyLong = header ~= nil and header >= LONG_HEADER_MIN and header <= LONG_HEADER_MAX
+        and r1 == 0 and r2 == 0 and dataPtr ~= nil and dataPtr ~= 0
+
+    if not alreadyLong then
+        local n = math.ceil(math.sqrt(byteCount))
+        header = (n * n) | 1
+        dataPtr = ZeroPage.allocate(byteCount + 1)
+        if not dataPtr then
+            return false
+        end
     end
 
     local writes = {
+        { address = ptr,      flags = Memory.FLAGS.INT32, value = header },
+        { address = ptr + 0x4, flags = Memory.FLAGS.INT32, value = 0 },
         { address = ptr + 0x8, flags = Memory.FLAGS.INT32, value = byteCount },
+        { address = ptr + 0xC, flags = Memory.FLAGS.INT32, value = 0 },
+        { address = ptr + 0x10, flags = Memory.FLAGS.INT64, value = dataPtr },
     }
     for i = 1, #nameBytes do
         writes[#writes + 1] = { address = dataPtr + (i - 1), flags = Memory.FLAGS.BYTE, value = nameBytes[i] }
     end
+    writes[#writes + 1] = { address = dataPtr + byteCount, flags = Memory.FLAGS.BYTE, value = 0 }
 
     return Memory.writeBatch(writes)
 end
 
----Write a string at baseAddress+offset. No length cap — the caller
----(or a higher-level field constraint, e.g. UI display limits) is
----responsible for validating length before calling this.
----
----Encoding is chosen automatically: if the encoded content
----(length byte included) fits within the inline budget (6 dwords /
----24 bytes), the inline form is used; otherwise the long
----(indirected) form is used.
----@param baseAddress integer
----@param field table
----@param value string
----@return boolean ok
+local STRING_OBJECT_SIZE = 0x18
+
 function M.set(baseAddress, field, value)
+    log(string.format("[set] base=0x%X offset=0x%X value='%s'", baseAddress, field.offset, tostring(value)))
     if type(value) ~= "string" then
         return false
     end
 
-    local ptr, err = Memory.deref(baseAddress, field.offset)
-    if not ptr then
-        return false
-    end
+    local ptr, err = resolvePtr(baseAddress, field)
+    local needsAlloc = not ptr or ptr == 0
 
-    local nameBytes = {}
-    local byteCount = 0
-
-    for _, code in utf8.codes(value) do
-        local encoded = utf8.char(code)
-        local bytes = { encoded:byte(1, -1) }
-        for _, b in ipairs(bytes) do
-            table.insert(nameBytes, b)
-            byteCount = byteCount + 1
+    if needsAlloc then
+        -- indirect == false means baseAddress+offset IS the string
+        -- storage (no separate object to allocate) — nothing we can do.
+        if field.indirect == false then
+            return false
+        end
+        ptr = ZeroPage.allocate(STRING_OBJECT_SIZE)
+        if not ptr then
+            return false
         end
     end
 
-    -- +1 accounts for the inline form's length byte occupying part
-    -- of the 6-dword budget alongside the character bytes.
-    if byteCount + 1 <= INLINE_MAX_BYTES then
-        return writeInline(ptr, nameBytes, byteCount)
+    local nameBytes = {}
+    local byteCount = #value
+
+    for i = 1, byteCount do
+        nameBytes[i] = string.byte(value, i)
     end
 
-    return writeLong(ptr, nameBytes, byteCount)
+    local writeOk
+    if byteCount + 1 <= INLINE_MAX_BYTES then
+        writeOk = writeInline(ptr, nameBytes, byteCount)
+    else
+        writeOk = writeLong(ptr, nameBytes, byteCount)
+    end
+
+    if not writeOk then
+        return false
+    end
+
+    if needsAlloc then
+        return Memory.write(baseAddress + field.offset, Memory.FLAGS.INT64, ptr)
+    end
+
+    return true
+end
+
+function M.collectWrite(baseAddress, field, value, writes)
+    if type(value) ~= "string" then return false end
+
+    local ptr, err = resolvePtr(baseAddress, field)
+    local needsAlloc = not ptr or ptr == 0
+
+    if needsAlloc then
+        if field.indirect == false then return false end
+        ptr = ZeroPage.allocate(STRING_OBJECT_SIZE)
+        if not ptr then return false end
+        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.INT64, value = ptr }
+    end
+
+    local nameBytes = {}
+    local byteCount = #value
+    for i = 1, byteCount do
+        nameBytes[i] = string.byte(value, i)
+    end
+    if byteCount + 1 <= INLINE_MAX_BYTES then
+        writes[#writes + 1] = { address = ptr, flags = Memory.FLAGS.BYTE, value = byteCount * 2 }
+        for i = 1, #nameBytes do
+            writes[#writes + 1] = { address = ptr + i, flags = Memory.FLAGS.BYTE, value = nameBytes[i] }
+        end
+    else
+        local alreadyLong = not needsAlloc and isLongForm(ptr)
+        local header, dataPtr
+        if alreadyLong then
+            local fields = Memory.readBatch({
+                { address = ptr, flags = Memory.FLAGS.INT32 },
+                { address = ptr + 0x10, flags = Memory.FLAGS.INT64 },
+            })
+            header = fields and fields[1] and fields[1].value
+            dataPtr = fields and fields[2] and fields[2].value
+        end
+        if not alreadyLong or dataPtr == nil or dataPtr == 0 then
+            local n = math.ceil(math.sqrt(byteCount))
+            header = (n * n) | 1
+            dataPtr = ZeroPage.allocate(byteCount + 1)
+            if not dataPtr then return false end
+        end
+        writes[#writes + 1] = { address = ptr, flags = Memory.FLAGS.INT32, value = header }
+        writes[#writes + 1] = { address = ptr + 0x4, flags = Memory.FLAGS.INT32, value = 0 }
+        writes[#writes + 1] = { address = ptr + 0x8, flags = Memory.FLAGS.INT32, value = byteCount }
+        writes[#writes + 1] = { address = ptr + 0xC, flags = Memory.FLAGS.INT32, value = 0 }
+        writes[#writes + 1] = { address = ptr + 0x10, flags = Memory.FLAGS.INT64, value = dataPtr }
+        for i = 1, #nameBytes do
+            writes[#writes + 1] = { address = dataPtr + (i - 1), flags = Memory.FLAGS.BYTE, value = nameBytes[i] }
+        end
+        writes[#writes + 1] = { address = dataPtr + byteCount, flags = Memory.FLAGS.BYTE, value = 0 }
+    end
+
+    return true
 end
 
 return M

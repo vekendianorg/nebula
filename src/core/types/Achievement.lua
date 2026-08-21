@@ -30,6 +30,14 @@ local Memory = loadModule("core/Memory.lua")
 
 local M = {}
 
+local function log(...)
+    if Nebula and Nebula.verbose then
+        print("[core.types.Achievement]", ...)
+    end
+end
+
+
+
 local FIELD_ID_OFF       = 0x18
 local FIELD_UNLOCKED_OFF = 0x1C
 local FIELD_STEPS_OFF    = 0x20

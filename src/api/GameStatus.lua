@@ -12,16 +12,22 @@
 --   Nebula.GameStatus.add("coins", 1000):dry()
 --   Nebula.GameStatus.sub("coins", 500)
 --   Nebula.GameStatus.meta("coins")
+--   Nebula.GameStatus.fields()
 
 local Memory   = loadModule("core/Memory.lua")
 local Type     = loadModule("core/Type.lua")
 local Repeated = loadModule("core/Repeated.lua")
+local Path     = loadModule("core/Path.lua")
+local Struct   = loadModule("core/Struct.lua")
 local metadata = loadModule("metadata/GameStatus.lua")
 
 local M = {}
 
 -- Fields considered dangerous enough to require :force().
 local DANGEROUS_FIELDS = {
+    playerId = true,
+    coins = true,
+    gems = true,
     cheater = true,
 }
 
@@ -76,26 +82,139 @@ M.resolveBase = resolveBase
 -- Field lookup helpers
 --==================================================
 
----@param id string
----@return table|nil field, string|nil error
-local function lookupField(id)
-    local field = metadata[id]
-    if field == nil then
-        return nil, "unknown_field: " .. tostring(id)
-    end
-    return field
-end
-
----@param field table
----@return boolean known
-local function isOffsetKnown(field)
-    return field.offset ~= 0xBAAD
-end
-
 local function log(...)
     if Nebula ~= nil and Nebula.log then
         print("[Nebula.GameStatus]", ...)
     end
+end
+
+local function isOffsetKnown(field)
+    return field.offset ~= nil and field.offset ~= 0xBAAD
+end
+
+local function resolvePath(id)
+    local segments = Path.parse(id)
+    if #segments == 0 then
+        log("[resolvePath] empty path")
+        return nil, "empty_path"
+    end
+
+    local base, baseErr = resolveBase()
+    if not base then
+        log(string.format("[resolvePath] base resolution failed: %s", tostring(baseErr)))
+        return nil, baseErr
+    end
+    log(string.format("[resolvePath] id='%s' base=0x%X segments=%d", id, base, #segments))
+
+    local currentBase = base
+    local currentMeta = metadata
+    local finalField = nil
+
+    for i, seg in ipairs(segments) do
+        local node = currentMeta[seg.name]
+        if node == nil then
+            log(string.format("[resolvePath] seg[%d] '%s' not found in metadata", i, seg.name))
+            return nil, "unknown_field: " .. tostring(id)
+        end
+
+        if seg.index ~= nil then
+            log(string.format("[resolvePath] seg[%d] '%s[%d]' type=%s offset=0x%X base=0x%X", i, seg.name, seg.index, tostring(node.type), node.offset or 0, currentBase))
+            if node.type ~= "Array" then
+                return nil, "not_an_array: " .. seg.name
+            end
+            if not isOffsetKnown(node) then
+                return nil, "offset_unknown: " .. seg.name
+            end
+            local arr, arrErr = Repeated.get(currentBase, node)
+            if not arr then
+                log(string.format("[resolvePath] Repeated.get failed for '%s': %s", seg.name, tostring(arrErr)))
+                return nil, arrErr
+            end
+            log(string.format("[resolvePath] '%s' array size=%d", seg.name, #arr))
+            local luaIdx = seg.index
+            if luaIdx < 1 or luaIdx > #arr then
+                return nil, string.format("index_out_of_bounds: %s[%d] (size=%d)", seg.name, seg.index, #arr)
+            end
+            if i == #segments then
+                log(string.format("[resolvePath] returning resolved value for '%s[%d]'", seg.name, seg.index))
+                local elemStride = node.elementStride or 0x8
+                local header, _ = Repeated.readHeaderForSet(currentBase, node)
+                local writeAddr = nil
+                if header and header.arrayPtr and header.arrayPtr ~= 0 then
+                    if elemStride > 0x8 then
+                        writeAddr = header.arrayPtr + (seg.index - 1) * elemStride
+                    else
+                        local slots, _ = Memory.readBatchChunked({
+                            { address = header.arrayPtr + (seg.index - 1) * 0x8, flags = Memory.FLAGS.INT64 }
+                        })
+                        if slots and slots[1] and slots[1].value ~= 0 then
+                            writeAddr = slots[1].value
+                        end
+                    end
+                end
+                return { value = arr[luaIdx], resolved = true, writeAddr = writeAddr, elementType = node.elementType }
+            end
+            if node.elements then
+                local stride = node.elementStride or 0x8
+                if stride > 0x8 then
+                    local header, hErr = Repeated.readHeaderForSet(currentBase, node)
+                    if not header then return nil, hErr end
+                    currentBase = header.arrayPtr + (seg.index - 1) * stride
+                    log(string.format("[resolvePath] inline element base=0x%X (arrayPtr=0x%X + (%d-1)*0x%X)", currentBase, header.arrayPtr, seg.index, stride))
+                else
+                    local h, he = Repeated.readHeaderForSet(currentBase, node)
+                    if not h then return nil, he end
+                    local slotAddr = h.arrayPtr + (seg.index - 1) * 0x8
+                    local slots, sErr = Memory.readBatchChunked({
+                        { address = slotAddr, flags = Memory.FLAGS.INT64 }
+                    })
+                    if not slots or not slots[1] or slots[1].value == 0 then
+                        log(string.format("[resolvePath] null element ptr at slotAddr=0x%X", slotAddr))
+                        return nil, "null_element_ptr"
+                    end
+                    currentBase = slots[1].value
+                    log(string.format("[resolvePath] ptr element base=0x%X (slotAddr=0x%X)", currentBase, slotAddr))
+                end
+                currentMeta = node.elements
+            else
+                return nil, "array_has_no_elements: " .. seg.name
+            end
+        elseif node.type == "Object" and i < #segments then
+            log(string.format("[resolvePath] seg[%d] '%s' Object offset=0x%X base=0x%X", i, seg.name, node.offset, currentBase))
+            if not isOffsetKnown(node) then
+                return nil, "offset_unknown: " .. seg.name
+            end
+            local ptr = Memory.deref(currentBase, node.offset)
+            if not ptr or ptr == 0 then
+                log(string.format("[resolvePath] null pointer deref at base+0x%X=0x%X", node.offset, currentBase))
+                return nil, "null_pointer: " .. seg.name
+            end
+            log(string.format("[resolvePath] Object deref ptr=0x%X", ptr))
+            currentBase = ptr
+            currentMeta = node
+        elseif node.type == "Array" and i == #segments then
+            log(string.format("[resolvePath] seg[%d] '%s' Array (final) offset=0x%X base=0x%X", i, seg.name, node.offset, currentBase))
+            finalField = node
+            break
+        elseif type(node.type) == "string" and i == #segments then
+            log(string.format("[resolvePath] seg[%d] '%s' type=%s (final) offset=0x%X base=0x%X", i, seg.name, node.type, node.offset, currentBase))
+            finalField = node
+            break
+        elseif type(node) == "table" and node.type == nil and i < #segments then
+            log(string.format("[resolvePath] seg[%d] '%s' namespace container", i, seg.name))
+            currentMeta = node
+        else
+            log(string.format("[resolvePath] seg[%d] '%s' unhandled node type=%s", i, seg.name, tostring(node.type)))
+            return nil, "unknown_field: " .. tostring(id)
+        end
+    end
+
+    if finalField then
+        log(string.format("[resolvePath] resolved field='%s' type=%s offset=0x%X base=0x%X", tostring(finalField.name or "?"), tostring(finalField.type), finalField.offset or 0, currentBase))
+        return { field = finalField, base = currentBase }
+    end
+    log(string.format("[resolvePath] no final field found for '%s'", id))
+    return nil, "unknown_field: " .. tostring(id)
 end
 
 ---Produce a compact, human-readable description of a value for
@@ -106,8 +225,8 @@ end
 ---@param value any
 ---@return string
 local function describeValue(field, value)
-    if field.repeated and type(value) == "table" then
-        return string.format("[ %d element(s) of %s ]", #value, tostring(field.type))
+    if field.type == "Array" and type(value) == "table" then
+        return string.format("[ %d element(s) ]", #value)
     end
 
     if field.type == "BitMask" and type(value) == "table" then
@@ -137,13 +256,37 @@ end
 ---@param id string
 ---@return any|nil value, string|nil error
 function M.get(id)
-    local field, fieldErr = lookupField(id)
-    if not field then
-        log("get failed:", fieldErr)
-        return nil, fieldErr
+    log(string.format("[get] id='%s'", id))
+    local result, err = resolvePath(id)
+    if not result then
+        log(string.format("[get] resolvePath failed: %s", tostring(err)))
+        return nil, err
     end
 
+    if result.resolved then
+        log(string.format("[get] returning pre-resolved value for '%s'", id))
+        return result.value
+    end
+
+    local field = result.field
+    local base = result.base
+    log(string.format("[get] field type=%s offset=0x%X base=0x%X", tostring(field.type), field.offset or 0, base))
+
     if field.type == "Object" then
+        local hasChildren = false
+        for _, v in pairs(field) do
+            if type(v) == "table" and type(v.offset) == "number" then
+                hasChildren = true
+                break
+            end
+        end
+        if hasChildren and isOffsetKnown(field) then
+            local ptr = Memory.deref(base, field.offset)
+            if not ptr or ptr == 0 then
+                return nil
+            end
+            return Struct.get(ptr, field, false)
+        end
         return nil, "unsupported_type: Object fields are not yet readable (missing nested metadata)"
     end
 
@@ -151,18 +294,12 @@ function M.get(id)
         return nil, "offset_unknown: " .. id
     end
 
-    local base, baseErr = resolveBase()
-    if not base then
-        log("get failed, no base:", baseErr)
-        return nil, baseErr
-    end
-
-    if field.repeated then
-        local values, err = Repeated.get(base, field)
-        if values == nil and err then
-            log("get('" .. id .. "') failed:", err)
+    if field.type == "Array" then
+        local values, arrErr = Repeated.get(base, field)
+        if values == nil and arrErr then
+            log("get('" .. id .. "') failed:", arrErr)
         end
-        return values, err
+        return values, arrErr
     end
 
     local impl = Type.resolve(field.type)
@@ -170,11 +307,11 @@ function M.get(id)
         return nil, "no_type_impl: " .. tostring(field.type)
     end
 
-    local value, err = impl.get(base, field)
-    if value == nil and err then
-        log("get('" .. id .. "') failed:", err)
+    local value, valErr = impl.get(base, field)
+    if value == nil and valErr then
+        log("get('" .. id .. "') failed:", valErr)
     end
-    return value, err
+    return value, valErr
 end
 
 --==================================================
@@ -186,13 +323,72 @@ local SetOperation = {}
 SetOperation.__index = SetOperation
 
 local function performWrite(op)
-    local field, fieldErr = lookupField(op.id)
-    if not field then
-        log("set failed:", fieldErr)
-        return false, fieldErr
+    log(string.format("[set] id='%s' value=%s", op.id, tostring(op.value)))
+    local result, err = resolvePath(op.id)
+    if not result then
+        log(string.format("[set] resolvePath failed: %s", tostring(err)))
+        return false, err
     end
 
+    if result.resolved then
+        if not result.writeAddr then
+            log("[set] cannot set array element value directly (no write address)")
+            return false, "cannot_set_array_element_value_directly"
+        end
+        if op._dry then
+            log(string.format("[dry] would set '%s' = %s", op.id, tostring(op.value)))
+            return true, nil
+        end
+        local elemType = result.elementType
+        if not elemType then
+            return false, "unknown_element_type"
+        end
+        local impl = Type.resolve(elemType)
+        if not impl then
+            return false, "no_type_impl: " .. tostring(elemType)
+        end
+        local f = { offset = 0, type = elemType }
+        if elemType == "String" then
+            f.indirect = false
+        end
+        local ok = impl.set(result.writeAddr, f, op.value)
+        if not ok then
+            log("set('" .. op.id .. "') failed")
+            return false, "write_failed"
+        end
+        log(string.format("set '%s' = %s", op.id, tostring(op.value)))
+        return true, nil
+    end
+
+    local field = result.field
+    local base = result.base
+    log(string.format("[set] field type=%s offset=0x%X base=0x%X", tostring(field.type), field.offset or 0, base))
+
     if field.type == "Object" then
+        local hasChildren = false
+        for _, v in pairs(field) do
+            if type(v) == "table" and type(v.offset) == "number" then
+                hasChildren = true
+                break
+            end
+        end
+        if hasChildren and isOffsetKnown(field) then
+            if op._dry then
+                log(string.format("[dry] would set '%s' = %s", op.id, describeValue(field, op.value)))
+                return true, nil
+            end
+            local ptr = Memory.deref(base, field.offset)
+            if not ptr or ptr == 0 then
+                return false, "null_pointer"
+            end
+            local ok = Struct.set(ptr, field, op.value, false)
+            if not ok then
+                log("set('" .. op.id .. "') failed")
+                return false, "write_failed"
+            end
+            log(string.format("set '%s' = %s", op.id, describeValue(field, op.value)))
+            return true, nil
+        end
         return false, "unsupported_type: Object fields are not yet writable (missing nested metadata)"
     end
 
@@ -209,17 +405,11 @@ local function performWrite(op)
         return true, nil
     end
 
-    local base, baseErr = resolveBase()
-    if not base then
-        log("set failed, no base:", baseErr)
-        return false, baseErr
-    end
-
-    if field.repeated then
-        local ok, err = Repeated.set(base, field, op.value)
+    if field.type == "Array" then
+        local ok, setErr = Repeated.set(base, field, op.value)
         if not ok then
-            log("set('" .. op.id .. "') failed:", err)
-            return false, err or "write_failed"
+            log("set('" .. op.id .. "') failed:", setErr)
+            return false, setErr or "write_failed"
         end
         log(string.format("set '%s' = %s", op.id, describeValue(field, op.value)))
         return true, nil
@@ -281,7 +471,7 @@ end
 -- Nebula.GameStatus.sub("coins", 500)   ==  set("coins", get("coins") - 500)
 --
 -- Only meaningful for numeric field types (Int32, Float,
--- SafeInt32) — String, Bool, BitMask, Achievement, and repeated
+-- SafeInt32) — String, Bool, BitMask, Array, Object, and repeated
 -- fields don't have a sensible "add" operation and are rejected
 -- with unsupported_operation rather than silently coercing.
 --
@@ -300,7 +490,8 @@ local NUMERIC_TYPES = {
 ---@param negate boolean
 ---@return table operation @ chainable, same shape as set()'s return
 local function performArithmetic(id, delta, negate)
-    local field, fieldErr = lookupField(id)
+    local result, fieldErr = resolvePath(id)
+    local field = result and result.field
     if not field then
         log("add/sub failed:", fieldErr)
         local self = setmetatable({ id = id, value = nil, _forced = false, _dry = false }, SetOperation)
@@ -308,7 +499,7 @@ local function performArithmetic(id, delta, negate)
         return self
     end
 
-    if field.repeated or not NUMERIC_TYPES[field.type] then
+    if not NUMERIC_TYPES[field.type] then
         log("add/sub failed: unsupported_operation for type " .. tostring(field.type))
         local self = setmetatable({ id = id, value = nil, _forced = false, _dry = false }, SetOperation)
         self._ok, self._err = false, "unsupported_operation: add/sub not valid for type " .. tostring(field.type)
@@ -367,22 +558,23 @@ local POINTER_BACKED_TYPES = {
 ---@param field table
 ---@return boolean
 local function isPointerBackedType(field)
-    if field.repeated then
-        return true -- repeated fields are always pointer-backed containers
+    if field.type == "Array" then
+        return true -- array fields are always pointer-backed containers
     end
     if POINTER_BACKED_TYPES[field.type] then
         return true
     end
     -- Anything not a known inline scalar is assumed to be a
     -- pointer-backed message/custom type.
-    local INLINE_SCALARS = { Int32 = true, Bool = true, Float = true, BitMask = true }
+    local INLINE_SCALARS = { Int32 = true, Bool = true, Float = true, BitMask = true, Enum = true }
     return not INLINE_SCALARS[field.type]
 end
 
 ---@param id string
 ---@return boolean|nil exists, string|nil error
 function M.has(id)
-    local field, fieldErr = lookupField(id)
+    local result, fieldErr = resolvePath(id)
+    local field = result and result.field
     if not field then
         log("has failed:", fieldErr)
         return nil, fieldErr
@@ -409,6 +601,24 @@ function M.has(id)
 
     local ptr = Memory.read(base + field.offset, Memory.FLAGS.POINTER)
     return ptr ~= nil and ptr ~= 0, nil
+end
+
+--==================================================
+-- fields() — read-only introspection
+--==================================================
+
+---List every offset-verified field's id. Fields still at the
+---0xBAAD placeholder are excluded.
+---@return string[] ids
+function M.fields()
+    local results = {}
+    for key, field in pairs(metadata) do
+        if type(field) == "table" and type(field.type) == "string" and isOffsetKnown(field) then
+            results[#results + 1] = key
+        end
+    end
+    table.sort(results)
+    return results
 end
 
 --==================================================
@@ -457,7 +667,8 @@ end
 ---@param id string
 ---@return table|nil metaView, string|nil error
 function M.meta(id)
-    local field, err = lookupField(id)
+    local result, err = resolvePath(id)
+    local field = result and result.field
     if not field then
         return nil, err
     end
@@ -466,7 +677,7 @@ function M.meta(id)
         name       = id,
         type       = field.type,
         offset     = field.offset,
-        repeated   = field.repeated,
+        repeated   = field.type == "Array" or false,
         risk       = DANGEROUS_FIELDS[id] and "high" or "low",
         known      = isOffsetKnown(field),
     }, MetaView)

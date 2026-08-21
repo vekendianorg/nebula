@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Documentation — Nebula SDK</title>
+<meta name="description" content="Nebula SDK documentation: install, philosophy, memory flags, type modules, base address resolution, and packing for release for HCR2 on GameGuardian.">
+<link rel="canonical" href="https://vekendianorg.github.io/nebula/docs.html">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Documentation — Nebula SDK">
+<meta property="og:description" content="Install, philosophy, memory flags, type modules, and packing guides for the Nebula SDK.">
+<meta property="og:image" content="https://vekendianorg.github.io/nebula/assets/og-image.jpg">
+<meta property="og:url" content="https://vekendianorg.github.io/nebula/docs.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Documentation — Nebula SDK">
+<meta name="twitter:image" content="https://vekendianorg.github.io/nebula/assets/og-image.jpg">
+
+<meta name="theme-color" content="#05060F">
+<link rel="icon" href="/nebula/assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/nebula/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/nebula/assets/apple-touch-icon.png">
+<link rel="manifest" href="/nebula/site.webmanifest">
+
+<link rel="stylesheet" href="/nebula/css/style.css">
+</head>
+<body id="body" data-assets-path="/nebula/">
+
+<canvas id="particle-canvas"></canvas>
+
+<nav class="nav">
+    <a href="/nebula/" class="nav-logo" data-no-transition>
+        <img src="/nebula/assets/favicon.svg" alt="">
+        Nebula SDK
+    </a>
+    <ul class="nav-links">
+        <li><button class="nav-search-btn" data-search-trigger aria-label="Search documentation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <span class="kbd-hint">Search</span>
+            <kbd class="kbd-hint">/</kbd>
+        </button></li>
+        <li><a href="/nebula/docs.html" class="nav-link" data-path="/nebula/docs.html">Docs</a></li>
+        <li><a href="/nebula/license.html" class="nav-link" data-path="/nebula/license.html">License</a></li>
+        <li>
+            <a href="https://github.com/vekendianorg/nebula" target="_blank" rel="noopener" class="gh-icon" aria-label="GitHub repository">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.5 0 12.3c0 5.44 3.44 10.05 8.21 11.68.6.12.82-.27.82-.6 0-.29-.01-1.06-.02-2.08-3.34.75-4.04-1.64-4.04-1.64-.55-1.42-1.34-1.8-1.34-1.8-1.09-.77.08-.75.08-.75 1.21.09 1.84 1.28 1.84 1.28 1.07 1.87 2.81 1.33 3.5 1.02.11-.79.42-1.33.76-1.64-2.67-.31-5.47-1.38-5.47-6.15 0-1.36.47-2.47 1.24-3.34-.12-.31-.54-1.57.12-3.28 0 0 1.01-.33 3.3 1.28a11.2 11.2 0 0 1 6.01 0c2.29-1.61 3.3-1.28 3.3-1.28.66 1.71.24 2.97.12 3.28.77.87 1.24 1.98 1.24 3.34 0 4.78-2.81 5.84-5.48 6.14.43.38.81 1.13.81 2.28 0 1.65-.01 2.98-.01 3.38 0 .33.22.72.83.6C20.57 22.34 24 17.73 24 12.3 24 5.5 18.63 0 12 0z"/></svg>
+            </a>
+        </li>
+    </ul>
+</nav>
+
+<div class="page-root">
+    <div class="doc-layout">
+        <aside class="doc-sidebar" id="doc-sidebar">
+            <div class="doc-sidebar-title">On this page</div>
+            <ul class="toc-list"><li><a href="#philosophy" class="toc-link" data-target="philosophy">Philosophy</a></li><li><a href="#status" class="toc-link" data-target="status">Status</a></li><li><a href="#install" class="toc-link" data-target="install">Install</a><ul class="toc-sublist"><li><a href="#local" class="toc-link toc-sub" data-target="local">Local</a></li><li><a href="#cloud" class="toc-link toc-sub" data-target="cloud">Cloud</a></li></ul></li><li><a href="#project-structure" class="toc-link" data-target="project-structure">Project structure</a></li><li><a href="#how-it-fits-together" class="toc-link" data-target="how-it-fits-together">How it fits together</a><ul class="toc-sublist"><li><a href="#mirrored-metadata" class="toc-link toc-sub" data-target="mirrored-metadata">Mirrored metadata</a></li><li><a href="#per-element-templates-elements" class="toc-link toc-sub" data-target="per-element-templates-elements">Per-element templates (elements)</a></li></ul></li><li><a href="#usage" class="toc-link" data-target="usage">Usage</a><ul class="toc-sublist"><li><a href="#publicevent-teamevent-communityevent" class="toc-link toc-sub" data-target="publicevent-teamevent-communityevent">PublicEvent / TeamEvent / CommunityEvent</a></li></ul></li><li><a href="#type-modules" class="toc-link" data-target="type-modules">Type modules</a><ul class="toc-sublist"><li><a href="#string-encoding" class="toc-link toc-sub" data-target="string-encoding">String encoding</a></li><li><a href="#safeint32" class="toc-link toc-sub" data-target="safeint32">SafeInt32</a></li><li><a href="#bitmask" class="toc-link toc-sub" data-target="bitmask">BitMask</a></li><li><a href="#repeated-array-fields" class="toc-link toc-sub" data-target="repeated-array-fields">Repeated / array fields</a></li></ul></li><li><a href="#base-address-resolution" class="toc-link" data-target="base-address-resolution">Base address resolution</a><ul class="toc-sublist"><li><a href="#gamestatus" class="toc-link toc-sub" data-target="gamestatus">GameStatus</a></li><li><a href="#publicevent-teamevent" class="toc-link toc-sub" data-target="publicevent-teamevent">PublicEvent / TeamEvent</a></li><li><a href="#communityevent" class="toc-link toc-sub" data-target="communityevent">CommunityEvent</a></li></ul></li><li><a href="#dangerous-fields" class="toc-link" data-target="dangerous-fields">Dangerous fields</a></li><li><a href="#verbose-logging" class="toc-link" data-target="verbose-logging">Verbose logging</a></li><li><a href="#packing-for-release" class="toc-link" data-target="packing-for-release">Packing for release</a></li><li><a href="#roadmap" class="toc-link" data-target="roadmap">Roadmap</a></li><li><a href="#api-reference" class="toc-link" data-target="api-reference">API Reference</a><ul class="toc-sublist"><li><a href="#communityevent" class="toc-link toc-sub" data-target="communityevent">CommunityEvent</a></li><li><a href="#gamestatus" class="toc-link toc-sub" data-target="gamestatus">GameStatus</a></li><li><a href="#publicevent" class="toc-link toc-sub" data-target="publicevent">PublicEvent</a></li><li><a href="#teamevent" class="toc-link toc-sub" data-target="teamevent">TeamEvent</a></li></ul></li></ul>
+        </aside>
+        <div style="min-width:0;">
+            <button class="doc-toc-toggle" id="toc-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                On this page
+            </button>
+            <div class="doc-header">
+                <span class="doc-eyebrow">Documentation</span>
+                <h1>Nebula</h1>
+                <p>A metadata-driven memory SDK for HCR2 (Hill Climb Racing 2), built for GameGuardian's Lua environment.</p>
+            </div>
+            <div class="doc-content" id="doc-content">
+                <h1 id="nebula">Nebula</h1>
+<p>A metadata-driven memory SDK for HCR2 (Hill Climb Racing 2), built for
+GameGuardian's Lua environment.</p>
+<p>Instead of writing raw <code>gg.getValues</code>/<code>gg.setValues</code> calls scattered
+across scripts, Nebula gives you a typed, declarative API:</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">999</span><span class="p">)</span>
+</code></pre></div>
+
+<p>The low-level memory work — pointer chasing, string encoding,
+anti-cheat checksum handling, array containers — is hidden behind a
+small set of reusable type modules, driven entirely by metadata
+tables.</p>
+<h2 id="philosophy">Philosophy</h2>
+<ul>
+<li>Open source</li>
+<li>Compatibility first</li>
+<li>Pure Lua + GG API (no LuaJava)</li>
+<li>Headless (no UI)</li>
+<li>Metadata-driven</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Actively in development. Base address resolution, scalar types,
+bitmasks, repeated/array fields, nested objects, inline struct
+arrays, and four API surfaces (<code>GameStatus</code>, <code>PublicEvent</code>,
+<code>TeamEvent</code>, <code>CommunityEvent</code>) are working and tested against a live
+game. The <code>lootDefinition</code> sub-struct with all 14 nested array fields
+is fully readable, including object arrays with inline C++ struct
+elements. Chest type enums (Int32 ↔ string) are handled
+bidirectionally for both get and set. CommunityEvent uses
+string-search resolution (not AOB) with vtable-marker validation.</p>
+<hr />
+<h2 id="install">Install</h2>
+<p>Nebula can be loaded two ways: from a <strong>local</strong> copy of the packed
+file on your device, or fetched fresh over the network from <strong>cloud</strong>
+(GitHub) every time the script runs. Both end with the same thing —
+a <code>Nebula</code> global with <code>Nebula.GameStatus</code> on it.</p>
+<h3 id="local">Local</h3>
+<ol>
+<li>Grab a packed build (see <a href="#packing-for-release">Packing for release</a>
+   below) — either build one yourself or download a prebuilt one from
+   the repo's <code>build/</code> folder.</li>
+<li>Put the <code>.lua</code> file anywhere on your device GG can read, e.g.
+   <code>/storage/sdcard0/#Vekendian/nebula/build/nebula-0.0.1.lua</code>.</li>
+<li>Load it from your script:</li>
+</ol>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">Nebula</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">dofile</span><span class="p">(</span><span class="s2">&quot;/storage/sdcard0/#Vekendian/nebula/build/nebula-0.0.1.lua&quot;</span><span class="p">)</span><span class="w"> </span><span class="c1">-- or whatever how you load another Lua</span>
+
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Local loading needs no network access and survives GG restarts — the
+tradeoff is you're responsible for re-downloading a new packed build
+yourself whenever Nebula updates.</p>
+<h3 id="cloud">Cloud</h3>
+<p>GG's <code>gg.makeRequest</code> can fetch a URL's contents directly into a
+string, which <code>load()</code> can then compile and execute.</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">Nebula</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">load</span><span class="p">(</span><span class="nv">gg</span><span class="p">.</span><span class="nf">makeRequest</span><span class="p">(</span><span class="s2">&quot;https://raw.githubusercontent.com/vekendianorg/nebula/refs/heads/main/build/nebula-0.0.1&quot;</span><span class="p">).</span><span class="nv">content</span><span class="p">)()</span>
+
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Cloud loading always pulls the exact bytes at that URL, so pin to a
+specific tagged build path (like <code>nebula-0.0.1</code> above) rather than a
+<code>main</code>-tracking "latest" file if you want reproducible behavior —
+swap the version segment in the URL when you want to move to a newer
+release. The tradeoff versus local is an extra network round-trip on
+every script run, and the script silently breaking if the URL ever
+goes away or GitHub is unreachable.</p>
+<hr />
+<h2 id="project-structure">Project structure</h2>
+<div class="hl" data-lang="text"><pre><span></span><code>Nebula
+├── main.lua                    -- entry point / dev-mode module loader
+├── bundle.py                   -- packs src/ into a single distributable .lua
+│
+├── api/
+│   ├── GameStatus.lua          -- public get/set/has/add/sub/meta surface
+│   ├── PublicEvent.lua         -- get/fields/meta surface; get() returns an event accessor
+│   ├── TeamEvent.lua           -- same surface as PublicEvent; separate base resolution
+│   └── CommunityEvent.lua      -- string-search resolution; vtable-marker validation
+│
+├── core/
+│   ├── Memory.lua               -- gg.getValues/setValues wrapper, base resolution, verbose timing
+│   ├── Type.lua                 -- type registry (name -&gt; get/set implementation)
+│   ├── Repeated.lua              -- repeated/array field container walker
+│   ├── Struct.lua                 -- struct element reader/writer (nested templates)
+│   └── types/
+│       ├── Int32.lua
+│       ├── Bool.lua
+│       ├── Float.lua
+│       ├── String.lua
+│       ├── SafeInt32.lua
+│       ├── BitMask.lua
+│       ├── Enum.lua               -- Int32 ↔ string enum (chest types, etc.)
+│       └── Achievement.lua       -- example named message type
+│
+└── metadata/
+    ├── GameStatus.lua            -- field table: offsets, types, per field
+    ├── PublicEvent.lua           -- canonical PublicEvent field schema/offsets
+    ├── TeamEvent.lua             -- mirrors PublicEvent&#39;s header, patches its own tail
+    ├── CommunityEvent.lua        -- standalone schema; string-search resolution
+    ├── Mirror.lua                -- helper for metadata mirrors
+    └── enums/
+        ├── GameStatusFlag.lua    -- bit name -&gt; value map for the `flags` field
+        └── ChestType.lua       -- chest ID ↔ name enum (common, rare, epic, ...)
+</code></pre></div>
+
+<h2 id="how-it-fits-together">How it fits together</h2>
+<ol>
+<li><strong><code>metadata/GameStatus.lua</code></strong> declares every known field on the
+   <code>GameStatus</code> struct: its byte offset, whether it's a repeated
+   field, and which type it is.</li>
+<li><strong><code>core/Type.lua</code></strong> is a registry mapping a type name (<code>"Int32"</code>,
+   <code>"String"</code>, <code>"Achievement"</code>, ...) to the module implementing
+   <code>get(base, field)</code> / <code>set(base, field, value)</code> for it.</li>
+<li><strong><code>core/Memory.lua</code></strong> is the only file that talks to <code>gg.*</code>
+   directly — every read/write in Nebula goes through it. It also
+   owns the (expensive) signature scan that locates the live
+   <code>GameStatus</code> struct in memory, and optional verbose per-call
+   timing (see <a href="#verbose-logging">Verbose logging</a>).</li>
+<li><strong><code>core/Repeated.lua</code></strong> walks array/repeated-field containers,
+   handling two container ABIs: protobuf <code>RepeatedField</code> (explicit
+   size/capacity as INT32) and C++ <code>std::vector</code> (begin/end/capEnd
+   pointers as INT64, size computed from pointer difference). The
+   container type is selected via the <code>container</code> field shadow.</li>
+<li><strong><code>core/Struct.lua</code></strong> reads/writes struct elements using a metadata
+   template. It handles nested objects (pointer-backed containers),
+   namespace containers, leaf fields, and Array fields — batch-reading
+   all array vector headers in a single <code>gg.getValues</code> call for
+   performance. Empty arrays and zero-value scalars are suppressed from
+   output for clean results.</li>
+<li><strong><code>api/GameStatus.lua</code></strong> ties it together: looks up a field in
+   metadata, resolves (and caches) the struct base address, and
+   dispatches to the right type module or to <code>Repeated</code>.</li>
+</ol>
+<p>Adding a new field is a metadata edit. Adding a new scalar or message
+type is a new file in <code>core/types/</code>. Neither requires touching the
+public API.</p>
+<h3 id="mirrored-metadata">Mirrored metadata</h3>
+<p>Some game structures share an identical schema and offsets but have
+different API retrieval paths. In that case, keep one canonical
+metadata file and make the other metadata file a mirror.</p>
+<p><code>metadata/PublicEvent.lua</code> is the canonical event schema.
+<code>metadata/TeamEvent.lua</code> mirrors it through <code>metadata/Mirror.lua</code>, so
+TeamEvent does not duplicate the offsets and does not need to inherit
+from <code>api/PublicEvent.lua</code>. If the shared schema changes, update the
+canonical metadata once and both event types receive the same fields.</p>
+<p>The API layer remains separate: <code>Nebula.PublicEvent.get()</code> and
+<code>Nebula.TeamEvent.get()</code> can have different retrieval implementations
+while consuming the same metadata schema.</p>
+<h3 id="per-element-templates-elements">Per-element templates (<code>elements</code>)</h3>
+<p>A field typed <code>"Array"</code> can carry an <code>elements</code> sub-table
+(<code>specialFeatures</code>, <code>eventRewards</code>) describing each array element's
+own field layout. <code>core/Struct.lua</code> reads these templates recursively,
+supporting nested <code>Object</code> containers (pointer-backed sub-structs like
+<code>lootDefinition</code>), <code>Array</code> fields with <code>elements</code> (struct arrays) or
+<code>elementType</code> + <code>elementStride</code> (simple typed arrays), and leaf fields.</p>
+<p>Two container ABIs are supported:
+- <strong>protobuf <code>RepeatedField</code></strong>: <code>{arrayPtr:INT64, size:INT32, capacity:INT32}</code> — used by GameStatus achievements
+- <strong>C++ <code>std::vector</code></strong>: <code>{begin:INT64, end:INT64, capEnd:INT64}</code> — size = <code>(end-begin)/stride</code> — used by PublicEvent/TeamEvent arrays</p>
+<p>The container type is selected via the <code>container = "vector"</code> shadow
+set by the API layer. Inline struct elements (<code>elementStride &gt; 0x8</code>)
+are read directly at <code>begin + i * stride</code> without pointer dereference.
+Pointer-based elements (<code>elementStride = 0x8</code> or default) dereference
+each slot as an INT64 pointer to the element struct.</p>
+<p>Empty arrays (size=0 or null begin) are suppressed from output —
+only fields with actual data appear in results.</p>
+<hr />
+<h2 id="usage">Usage</h2>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="c1">-- Read</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">coins</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+
+<span class="c1">-- Array index access (1-based)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">part</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;vehicleStatus[1].tuningPartPresets[1].equippedParts[1]&quot;</span><span class="p">)</span>
+
+<span class="c1">-- Write scalar</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">999</span><span class="p">)</span>
+
+<span class="c1">-- Write nested array element</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;vehicleStatus[1].tuningPartPresets[1].equippedParts[1]&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;new_part&quot;</span><span class="p">)</span>
+
+<span class="c1">-- Dangerous fields require an explicit :force()</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;cheater&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">):</span><span class="nf">force</span><span class="p">()</span>
+
+<span class="c1">-- Validate without touching memory</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">999</span><span class="p">):</span><span class="nf">dry</span><span class="p">()</span>
+
+<span class="c1">-- Cheap existence check, no full decode</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">has</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">)</span>
+
+<span class="c1">-- Numeric read-modify-write shortcuts (same :force()/:dry() chain as set())</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">sub</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">500</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">):</span><span class="nf">dry</span><span class="p">()</span>
+
+<span class="c1">-- Introspect a field without reading its value</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">meta</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nv">meta</span><span class="p">.</span><span class="py">name</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">type</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">offset</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">risk</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">known</span><span class="p">)</span>
+
+<span class="c1">-- BitMask fields decode into a boxed value with its own methods</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;flags&quot;</span><span class="p">)</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">has</span><span class="p">(</span><span class="s2">&quot;DebuggerDetected&quot;</span><span class="p">)</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">enable</span><span class="p">(</span><span class="s2">&quot;IsPitCrew&quot;</span><span class="p">)</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">disable</span><span class="p">(</span><span class="s2">&quot;MemoryHacker&quot;</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;flags&quot;</span><span class="p">,</span><span class="w"> </span><span class="nv">flags</span><span class="p">)</span>
+
+<span class="c1">-- Repeated fields return a plain Lua array of decoded elements</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">achievements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;achievements&quot;</span><span class="p">)</span>
+<span class="kr">for</span><span class="w"> </span><span class="nv">i</span><span class="p">,</span><span class="w"> </span><span class="nv">achievement</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">achievements</span><span class="p">)</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">achievement</span><span class="p">.</span><span class="py">id</span><span class="p">,</span><span class="w"> </span><span class="nv">achievement</span><span class="p">.</span><span class="py">unlocked</span><span class="p">,</span><span class="w"> </span><span class="nv">achievement</span><span class="p">.</span><span class="py">steps</span><span class="p">)</span>
+<span class="kr">end</span>
+</code></pre></div>
+
+<p><code>set()</code>, <code>add()</code>, and <code>sub()</code> all execute immediately by default —
+the returned object is only needed if you want to call <code>:force()</code>
+(bypass the dangerous-field guard) or <code>:dry()</code> (validate everything
+except the actual memory write) explicitly.</p>
+<h3 id="publicevent-teamevent-communityevent">PublicEvent / TeamEvent / CommunityEvent</h3>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="c1">-- Single field, resolves (and caches) the currently-active event&#39;s</span>
+<span class="c1">-- base address under the hood</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;startTime&quot;</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.entryFeeTickets&quot;</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;minRankToJoin&quot;</span><span class="p">)</span>
+
+<span class="c1">-- get() with no id returns an event accessor bound to the</span>
+<span class="c1">-- currently-active struct&#39;s base address — read multiple fields off</span>
+<span class="c1">-- that exact snapshot instead of re-resolving per call</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">TeamEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nv">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.numberOfParallelSessions&quot;</span><span class="p">)</span>
+
+<span class="kd">local</span><span class="w"> </span><span class="nv">PublicEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;gameMode.duration&quot;</span><span class="p">)</span>
+<span class="nv">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;gameMode.pointsSystem.gemsToPointsConversion&quot;</span><span class="p">)</span>
+
+<span class="kd">local</span><span class="w"> </span><span class="nv">CommunityEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+<span class="nv">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.maxEventTickets&quot;</span><span class="p">)</span>
+
+<span class="c1">-- List every field with a verified (non-placeholder) offset</span>
+<span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">id</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">fields</span><span class="p">())</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">id</span><span class="p">)</span>
+<span class="kr">end</span>
+
+<span class="c1">-- Introspect a field without reading its value</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">meta</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nv">meta</span><span class="p">.</span><span class="py">name</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">type</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">offset</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">known</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>Nebula.TeamEvent.get()</code> (and <code>PublicEvent</code>, <code>CommunityEvent</code>) with
+no id resolves the base immediately and hands back an object bound
+to that specific struct address — the plain <code>get(id)</code> form
+re-resolves (from cache) on every call instead. Both end up calling
+the same underlying reader, so pick whichever reads better for the
+call site: one field → the plain form; several fields off the same
+event → the accessor form.</p>
+<p>CommunityEvent uses string-search resolution (searching for the
+ASCII bytes of <code>"community Showcase\0"</code>) with vtable-marker
+validation (<code>0x6D6F631E</code> at <code>base + 0x8</code>), rather than the AOB
+byte-signature scanning used by PublicEvent and TeamEvent.</p>
+<p>GG value-type flags used throughout Nebula (<code>core/Memory.lua</code>
+<code>M.FLAGS</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BYTE</code></td>
+<td>1</td>
+<td>single byte</td>
+</tr>
+<tr>
+<td><code>WORD</code></td>
+<td>2</td>
+<td>2 bytes</td>
+</tr>
+<tr>
+<td><code>INT32</code></td>
+<td>4</td>
+<td>4-byte signed int</td>
+</tr>
+<tr>
+<td><code>XOR</code></td>
+<td>8</td>
+<td>reserved, unused</td>
+</tr>
+<tr>
+<td><code>FLOAT</code></td>
+<td>16</td>
+<td>4-byte IEEE-754 float</td>
+</tr>
+<tr>
+<td><code>INT64</code></td>
+<td>32</td>
+<td>8-byte int / pointer</td>
+</tr>
+<tr>
+<td><code>DOUBLE</code></td>
+<td>64</td>
+<td>8-byte IEEE-754 double</td>
+</tr>
+</tbody>
+</table>
+<h2 id="type-modules">Type modules</h2>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Layout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Int32</code></td>
+<td>direct 4-byte signed int at <code>base + offset</code></td>
+</tr>
+<tr>
+<td><code>Bool</code></td>
+<td>single byte at <code>base + offset</code>, <code>0x00</code>/<code>0x01</code></td>
+</tr>
+<tr>
+<td><code>Float</code></td>
+<td>direct 4-byte float at <code>base + offset</code></td>
+</tr>
+<tr>
+<td><code>String</code></td>
+<td>inline or pointer-deref; two encodings (inline/long). <code>indirect=false</code> for C++ inline strings</td>
+</tr>
+<tr>
+<td><code>SafeInt32</code></td>
+<td>pointer at <code>base + offset</code> to an anti-cheat-protected int struct</td>
+</tr>
+<tr>
+<td><code>BitMask</code></td>
+<td>direct 4-byte int at <code>base + offset</code>, boxed with <code>:has()</code>/<code>:enable()</code>/<code>:disable()</code>/<code>:toggle()</code></td>
+</tr>
+<tr>
+<td><code>Achievement</code></td>
+<td>pointer to a struct (<code>id</code>/<code>unlocked</code>/<code>steps</code>); example of a named message type</td>
+</tr>
+</tbody>
+</table>
+<h3 id="string-encoding">String encoding</h3>
+<p>Strings use one of two layouts depending on length, auto-detected
+on read and auto-selected on write:</p>
+<p><strong>Inline</strong> (fits in 6 dwords / 24 bytes, length byte included):</p>
+<div class="hl" data-lang="text"><pre><span></span><code>ptr + 0x0   length byte (byteCount * 2)
+ptr + 0x1.. raw chars
+</code></pre></div>
+
+<p><strong>Long / indirected</strong> (used once inline would overflow):</p>
+<div class="hl" data-lang="text"><pre><span></span><code>ptr + 0x0   header, expected in range [9, 99]
+ptr + 0x4   must be 0
+ptr + 0x8   length (raw char count, not multiplied)
+ptr + 0xC   must be 0
+ptr + 0x10  pointer to the actual char data
+</code></pre></div>
+
+<h3 id="safeint32">SafeInt32</h3>
+<p>Fields of this type store a <strong>pointer</strong> at <code>base + offset</code>, not an
+inline struct. The struct itself lives at that pointer:</p>
+<div class="hl" data-lang="text"><pre><span></span><code>structPtr + 0x18  safeValue
+structPtr + 0x1C  key
+structPtr + 0x20  checksum
+structPtr + 0x24  keyChecksum
+</code></pre></div>
+
+<p>Values are XOR-encoded against a single account-wide static key
+(<code>GameStatus.safeIntStaticKey</code>, offset <code>0x6AC</code>), resolved internally
+— individual fields don't declare it.</p>
+<h3 id="bitmask">BitMask</h3>
+<p>Fields of this type are a plain 4-byte int at <code>base + offset</code>, but
+<code>get()</code> returns a boxed instance instead of a raw number:</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;flags&quot;</span><span class="p">)</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">has</span><span class="p">(</span><span class="s2">&quot;DebuggerDetected&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">-- bit membership check</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">enable</span><span class="p">(</span><span class="s2">&quot;IsPitCrew&quot;</span><span class="p">)</span><span class="w">       </span><span class="c1">-- set a bit</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">disable</span><span class="p">(</span><span class="s2">&quot;MemoryHacker&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">-- clear a bit</span>
+<span class="nv">flags</span><span class="p">:</span><span class="nf">toggle</span><span class="p">(</span><span class="s2">&quot;SomeFlag&quot;</span><span class="p">)</span><span class="w">        </span><span class="c1">-- flip a bit</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;flags&quot;</span><span class="p">,</span><span class="w"> </span><span class="nv">flags</span><span class="p">)</span><span class="w">  </span><span class="c1">-- accepts the boxed instance or a raw int</span>
+</code></pre></div>
+
+<p>The bit-name-to-value mapping comes from <code>field.enum</code> in metadata,
+pointing at a file under <code>metadata/enums/</code> (e.g. <code>GameStatusFlag.lua</code>).</p>
+<p><code>meta("flags").flags</code> also decodes the live value into a plain
+<code>{ FlagName = true/false, ... }</code> table for quick introspection,
+separate from the boxed value's own <code>:has()</code>.</p>
+<h3 id="repeated-array-fields">Repeated / array fields</h3>
+<p>A field with <code>repeated = true</code> is a container, walked by
+<code>core/Repeated.lua</code> rather than a type module directly:</p>
+<div class="hl" data-lang="text"><pre><span></span><code>base + field.offset = ptr        -- this address IS the container header
+
+ptr + 0x0   arrayPtr   (int64, pointer to backing array)
+ptr + 0x8   size       (int32, live element count)
+ptr + 0xC   capacity   (int32, allocated slot count)
+ptr + 0x10  allocSlots (int32, next-pow2 of size — derived, not authoritative)
+</code></pre></div>
+
+<p>Element slots sit 8 bytes apart starting at <code>arrayPtr</code>. For
+message/custom element types (anything that isn't a known inline
+scalar), each slot holds a <strong>pointer</strong> to the element's own struct.</p>
+<p><code>size</code>/<code>capacity</code> are sanity-bounded before being trusted (rejected
+if negative, over a fixed ceiling, or <code>size &gt; capacity</code>) — a
+misread/garbage header fails cleanly with a descriptive error instead
+of driving a runaway loop or table allocation.</p>
+<p><code>Repeated.get()</code> batches aggressively: message types can optionally
+implement <code>M.specs(base)</code> / <code>M.parse(results)</code> (see <code>Achievement.lua</code>)
+to describe their field reads without doing I/O, letting <code>Repeated</code>
+collect every element's reads into one cross-element <code>gg.getValues</code>
+call instead of one call per element. Types without this interface
+fall back to a plain per-element <code>get()</code>.</p>
+<p><code>Repeated.set()</code> only ever writes into existing slots and never grows
+the backing array or allocates new element structs — Nebula doesn't
+own the game's allocator, so a write larger than <code>capacity</code> fails
+cleanly with <code>capacity_exceeded</code> rather than attempting anything
+unsafe.</p>
+<hr />
+<h2 id="base-address-resolution">Base address resolution</h2>
+<h3 id="gamestatus">GameStatus</h3>
+<p><code>Memory.resolveGameStatusBase()</code> locates the live <code>GameStatus</code>
+struct by:</p>
+<ol>
+<li>Searching each memory region (<code>gg.REGION_C_ALLOC</code>, then
+   <code>gg.REGION_OTHER</code>) for the <code>"startup_count"</code> string constant.</li>
+<li>For each hit, reading a pointer at <code>hit + 0x1F</code> and sanity-checking
+   it's in a plausible address range (rules out AOB false-positives
+   landing inside unrelated string literals).</li>
+<li>Validating a vtable/version marker at <code>ptr + 0x10</code> against a
+   known set of values.</li>
+<li>Reading a second pointer at <code>ptr + 0x80</code> — this is the resolved
+   struct base.</li>
+</ol>
+<p><code>api/GameStatus.lua</code> caches the result for the lifetime of the
+script session; the scan only runs once unless explicitly forced.</p>
+<h3 id="publicevent-teamevent">PublicEvent / TeamEvent</h3>
+<p>AOB byte-signature scanning for stable config constants (e.g.
+<code>eventTicketRefillTime=14400</code> for TeamEvent,
+<code>gemsToPointsConversion=6</code> for PublicEvent), followed by structural
+validation (<code>contentVersion</code>, <code>startTime</code>, <code>endTime</code>). Results are
+merged with a persistent address cache so cached addresses survive
+signature field modifications. The AOB scan always runs regardless
+of cache state.</p>
+<h3 id="communityevent">CommunityEvent</h3>
+<p>String-search resolution instead of AOB: searches for the ASCII
+bytes of <code>"community Showcase\0"</code>, refines by first byte (<code>0x24</code>),
+then validates each hit by checking the vtable marker <code>0x6D6F631E</code>
+at <code>hit - 0x18</code>. Struct base = <code>hit - 0x20</code>. Same cache integration
+as PublicEvent/TeamEvent — the string scan always runs, and cached
+addresses passing vtable validation are kept. Unlike the other event
+modules, CommunityEvent validation uses the vtable marker rather
+than timestamp fields.</p>
+<hr />
+<h2 id="dangerous-fields">Dangerous fields</h2>
+<p>Some fields are gated behind <code>:force()</code> to prevent accidental writes
+(currently just <code>cheater</code>). Calling <code>set()</code>, <code>add()</code>, or <code>sub()</code> on a
+dangerous field without <code>:force()</code> fails with
+<code>dangerous_field_requires_force</code>.</p>
+<hr />
+<h2 id="verbose-logging">Verbose logging</h2>
+<p>Two independent, opt-in logging switches:</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="nv">Nebula</span><span class="p">.</span><span class="py">log</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">      </span><span class="c1">-- api/GameStatus.lua: high-level get/set/has/add/sub/dry logging</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">verbose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">  </span><span class="c1">-- core/Memory.lua: per-call gg.getValues/setValues timing</span>
+</code></pre></div>
+
+<p><code>Nebula.verbose</code> is useful for tracking down slowness — it prints the
+call kind, batch size, and elapsed time for every single <code>gg.*</code>
+round-trip, e.g.:</p>
+<div class="hl" data-lang="text"><pre><span></span><code>[Nebula.Memory] readBatch    count=36   4.00ms
+</code></pre></div>
+
+<p>Both default to <code>false</code>; <code>main.lua</code>'s field-test loop leaves them off
+unless you flip them on for debugging.</p>
+<hr />
+<h2 id="packing-for-release">Packing for release</h2>
+<div class="hl" data-lang="text"><pre><span></span><code>python bundle.py                 # pack src/ -&gt; build/nebula-&lt;version&gt;.lua equivalent
+python bundle.py -m              # + strip comments / minify
+python bundle.py -o out.lua      # custom output path
+python bundle.py -v 1.0.0        # inject version string
+</code></pre></div>
+
+<p>The bundler walks <code>src/</code>, embeds every module into a <code>__vfs</code> table,
+strips <code>main.lua</code>'s native loader block, and replaces it with a
+VFS-aware <code>loadModule()</code> — so the exact same <code>loadModule("core/...")</code>
+calls used in dev mode keep working unchanged in the packed output.
+This is what makes both <a href="#local">local</a> and <a href="#cloud">cloud</a> loading
+work from a single distributable file with no directory structure
+required at runtime.</p>
+<hr />
+<h2 id="roadmap">Roadmap</h2>
+<ul>
+<li>[ ] Fill in remaining unknown offsets (<code>0xBAAD</code> placeholders) in
+      <code>metadata/GameStatus.lua</code></li>
+<li>[ ] Additional message types beyond <code>Achievement</code>
+      (<code>DriverCustomization</code>, <code>RewardManagerStatus</code>, <code>VipStatus</code>, ...)</li>
+<li>[ ] Additional modules beyond <code>GameStatus</code>: <code>Vehicle</code>, <code>Garage</code>, ...</li>
+<li>[ ] Fill in remaining unknown offsets (<code>0xBAAD</code> placeholders) in
+      event metadata files</li>
+</ul>
+<h2 id="api-reference">API Reference</h2>
+<h3 id="communityevent">CommunityEvent</h3>
+<p>Read and write fields off whichever <code>CommunityEvent</code> (CommunityShowcase)
+struct is currently active in memory. Like the other event modules,
+every method is metadata-driven — the field list comes from
+<code>metadata/CommunityEvent.lua</code>. Unlike <code>PublicEvent</code> and <code>TeamEvent</code>
+which use AOB byte-signature scanning, CommunityEvent uses
+string-search resolution: it searches for the ASCII bytes of
+<code>"community Showcase\0"</code> and validates hits via a vtable marker
+(<code>0x6D6F631E</code> at <code>base + 0x8</code>). This is a simpler struct than
+PublicEvent/TeamEvent — no reward/loot fields, no contentVersion.</p>
+<h4 id="communityevent-get" class="fn-signature">CommunityEvent.get(fieldName)</h4>
+<p>Reads a single field by its dotted name and returns it as a plain Lua
+value. Resolves (and caches) the currently-active event's base
+address on first use.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name as declared in <code>metadata/CommunityEvent.lua</code>, e.g. <code>"startTime"</code> or <code>"sessionEntry.entryFeeTickets"</code></li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(number | string | table) — the field's current value, typed according to its metadata entry</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">startTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;startTime&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">tickets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.maxEventTickets&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="communityevent-get" class="fn-signature">CommunityEvent.get()</h4>
+<p>Called with no argument, resolves the currently-active event's base
+address immediately and returns an accessor/context object with its
+own <code>get(fieldName)</code> bound to that exact snapshot. Prefer this over
+the plain <code>get(fieldName)</code> form when reading several fields off the
+same event.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — an object with a <code>get(fieldName)</code> field, or <code>nil</code> plus an error string if no event is currently active</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">event</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+<span class="nv">event</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.maxEventTickets&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="communityevent-set" class="fn-signature">CommunityEvent.set(fieldName, value)</h4>
+<p>Writes a field value to the currently-active CommunityEvent struct.
+Returns a chainable operation object supporting <code>:dry()</code>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name</li>
+<li><code>value</code> (number | string | table) — the value to write</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(table) — a chainable operation object; already executed</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;startTime&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1700000000</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;startTime&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1700000000</span><span class="p">):</span><span class="nf">dry</span><span class="p">()</span>
+</code></pre></div>
+<h4 id="communityevent-fields" class="fn-signature">CommunityEvent.fields()</h4>
+<p>Lists every field's dotted id that has a verified (non-placeholder)
+offset. Fields still at the <code>0xBAAD</code> placeholder in
+<code>metadata/CommunityEvent.lua</code> are excluded.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — a sorted array of dotted field-name strings</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">id</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">fields</span><span class="p">())</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">id</span><span class="p">)</span>
+<span class="kr">end</span>
+</code></pre></div>
+<h4 id="communityevent-meta" class="fn-signature">CommunityEvent.meta(fieldName)</h4>
+<p>Introspects a field's declared metadata without reading its live
+value.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(table) — <code>{ type, offset, repeated, known }</code></p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">CommunityEvent</span><span class="p">.</span><span class="nf">meta</span><span class="p">(</span><span class="s2">&quot;minRankToJoin&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nv">meta</span><span class="p">.</span><span class="py">type</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">offset</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">known</span><span class="p">)</span>
+</code></pre></div>
+
+<p></parameter></p>
+<h3 id="gamestatus">GameStatus</h3>
+<p>Read and write typed fields on the player's save-game struct. All
+methods are metadata-driven — the field list comes from
+<code>metadata/gamestatus.lua</code>, not from hardcoded offsets in this module.</p>
+<h4 id="gamestatus-get" class="fn-signature">GameStatus.get(fieldName)</h4>
+<p>Reads a single field by name and returns it as a plain Lua value (or a
+boxed value for <code>BitMask</code>/message-type fields — see <a href="#type-modules">Type modules</a>).</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's name as declared in <code>metadata/gamestatus.lua</code></li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(number | string | boolean | table) — the field's current value, typed according to its metadata entry</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">coins</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;flags&quot;</span><span class="p">)</span><span class="w"> </span><span class="c1">-- BitMask fields return a boxed table, see :has()/:enable()</span>
+</code></pre></div>
+<h4 id="gamestatus-set" class="fn-signature">GameStatus.set(fieldName, value)</h4>
+<p>Writes a single field by name. Values are validated against the
+field's declared type before the write happens — passing a string to
+an <code>Int32</code> field, for example, raises a Lua error instead of silently
+corrupting memory.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's name as declared in <code>metadata/gamestatus.lua</code></li>
+<li><code>value</code> (number | string | boolean | table) — the new value; must match the field's declared type</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(boolean) — <code>true</code> if the write succeeded</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;coins&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">999</span><span class="p">)</span>
+<span class="nv">Nebula</span><span class="p">.</span><span class="py">GameStatus</span><span class="p">.</span><span class="nf">set</span><span class="p">(</span><span class="s2">&quot;playerName&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Hillbilly&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p>Dangerous fields (see <a href="#dangerous-fields">Dangerous fields</a>) additionally
+require <code>:force()</code> or <code>:dry()</code> to be called explicitly — see that section
+for why.</p>
+<h3 id="publicevent">PublicEvent</h3>
+<p>Read fields off whichever <code>PublicEvent</code> struct is currently active in
+memory. Like <code>GameStatus</code>, every method is metadata-driven — the
+field list comes from <code>metadata/PublicEvent.lua</code>, not from hardcoded
+offsets in this module. Unlike <code>GameStatus</code>'s single fixed struct,
+there can be several <code>PublicEvent</code> instances in memory at once
+(past/current/upcoming events); base resolution picks out whichever
+one's <code>startTime</code>/<code>endTime</code> window contains the current time — see
+<a href="#base-address-resolution">Base address resolution</a>.</p>
+<h4 id="publicevent-get" class="fn-signature">PublicEvent.get(fieldName)</h4>
+<p>Reads a single field by its dotted name and returns it as a plain Lua
+value. Resolves (and caches) the currently-active event's base
+address on first use.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name as declared in <code>metadata/PublicEvent.lua</code>, e.g. <code>"startTime"</code> or <code>"gameMode.duration"</code></li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(number | string | table) — the field's current value, typed according to its metadata entry</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">startTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;startTime&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;gameMode.duration&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="publicevent-get" class="fn-signature">PublicEvent.get()</h4>
+<p>Called with no argument, resolves the currently-active event's base
+address immediately and returns an accessor/context object with its
+own <code>get(fieldName)</code> bound to that exact snapshot. Prefer this over
+the plain <code>get(fieldName)</code> form when reading several fields off the
+same event, so a sequence of reads stays consistent even if
+resolution were to happen again in between. No separate step is
+needed to trigger resolution — <code>get()</code> alone does it.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — an object with a <code>get(fieldName)</code> field, or <code>nil</code> plus an error string if no event is currently active</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">event</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nv">event</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;gameMode.pointsSystem.gemsToPointsConversion&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="publicevent-fields" class="fn-signature">PublicEvent.fields()</h4>
+<p>Lists every field's dotted id that has a verified (non-placeholder)
+offset. Fields still at the <code>0xBAAD</code> placeholder in
+<code>metadata/PublicEvent.lua</code>, and per-element <code>Array</code> templates (see
+<a href="#per-element-templates-elements">Per-element templates</a>), are
+excluded.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — a sorted array of dotted field-name strings</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">id</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">fields</span><span class="p">())</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">id</span><span class="p">)</span>
+<span class="kr">end</span>
+</code></pre></div>
+<h4 id="publicevent-meta" class="fn-signature">PublicEvent.meta(fieldName)</h4>
+<p>Introspects a field's declared metadata without reading its live
+value.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(table) — <code>{ name, type, offset, repeated, known, address }</code> — <code>address</code> is only populated once a base has been resolved</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">PublicEvent</span><span class="p">.</span><span class="nf">meta</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nv">meta</span><span class="p">.</span><span class="py">name</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">type</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">offset</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">known</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="teamevent">TeamEvent</h3>
+<p>Read fields off whichever <code>TeamEvent</code> struct is
+currently active in memory. Same surface as <code>PublicEvent</code> —
+<code>get(fieldName)</code>, <code>get()</code>, <code>fields()</code>, <code>meta(fieldName)</code> — but
+its metadata mirrors <code>PublicEvent</code>'s shared header while patching its
+own divergent tail (<code>multiRaceGameModes</code>, <code>winningTeamReward</code> instead
+of <code>fixedVehicles</code>/<code>specialFeatures</code>/<code>eventSpecials</code>/<code>premiumEventRewards</code>),
+and it resolves its base address independently — see
+<code>metadata/TeamEvent.lua</code> and <a href="#mirrored-metadata">Mirrored metadata</a>.</p>
+<h4 id="teamevent-get" class="fn-signature">TeamEvent.get(fieldName)</h4>
+<p>Reads a single field by its dotted name and returns it as a plain Lua
+value. Resolves (and caches) the currently-active event's base
+address on first use.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name as declared in <code>metadata/TeamEvent.lua</code>, e.g. <code>"minTeamSizeToJoin"</code> or <code>"sessionEntry.entryFeeTickets"</code></li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(number | string | table) — the field's current value, typed according to its metadata entry</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">minSize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="kd">local</span><span class="w"> </span><span class="nv">fee</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.entryFeeTickets&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="teamevent-get" class="fn-signature">TeamEvent.get()</h4>
+<p>Called with no argument, resolves the currently-active team event's
+base address immediately and returns an accessor/context object with
+its own <code>get(fieldName)</code> bound to that exact snapshot. No separate
+step is needed to trigger resolution.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — an object with a <code>get(fieldName)</code> field, or <code>nil</code> plus an error string if no team event is currently active</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">TeamEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">()</span>
+<span class="nv">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nv">TeamEvent</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="s2">&quot;sessionEntry.numberOfParallelSessions&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="teamevent-fields" class="fn-signature">TeamEvent.fields()</h4>
+<p>Lists every field's dotted id that has a verified (non-placeholder)
+offset — same rules as <code>PublicEvent.fields()</code>.</p>
+<p><strong>Returns</strong></p>
+<p>(table) — a sorted array of dotted field-name strings</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kr">for</span><span class="w"> </span><span class="nv">_</span><span class="p">,</span><span class="w"> </span><span class="nv">id</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nb">ipairs</span><span class="p">(</span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">fields</span><span class="p">())</span><span class="w"> </span><span class="kr">do</span>
+<span class="w">    </span><span class="nb">print</span><span class="p">(</span><span class="nv">id</span><span class="p">)</span>
+<span class="kr">end</span>
+</code></pre></div>
+<h4 id="teamevent-meta" class="fn-signature">TeamEvent.meta(fieldName)</h4>
+<p>Introspects a field's declared metadata without reading its live
+value.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>fieldName</code> (string) — the field's dotted name</li>
+</ul>
+<p><strong>Returns</strong></p>
+<p>(table) — <code>{ name, type, offset, repeated, known, address }</code> — <code>address</code> is only populated once a base has been resolved</p>
+<div class="hl" data-lang="lua"><pre><span></span><code><span class="kd">local</span><span class="w"> </span><span class="nv">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">Nebula</span><span class="p">.</span><span class="py">TeamEvent</span><span class="p">.</span><span class="nf">meta</span><span class="p">(</span><span class="s2">&quot;minTeamSizeToJoin&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nv">meta</span><span class="p">.</span><span class="py">name</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">type</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">offset</span><span class="p">,</span><span class="w"> </span><span class="nv">meta</span><span class="p">.</span><span class="py">known</span><span class="p">)</span>
+</code></pre></div>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <p>&copy; 2026 Vekendian Organization.</p>
+    </div>
+</div>
+
+<!-- Search modal -->
+<div class="search-overlay" id="search-overlay">
+    <div class="search-panel">
+        <div class="search-input-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" class="search-input" id="search-input" placeholder="Search documentation..." autocomplete="off" spellcheck="false">
+            <button class="search-esc" id="search-close">Esc</button>
+        </div>
+        <div class="search-results" id="search-results"></div>
+        <div class="search-hint">
+            <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span>
+            <span><kbd>&crarr;</kbd> select</span>
+            <span><kbd>esc</kbd> close</span>
+        </div>
+    </div>
+</div>
+
+<script src="/nebula/js/particles.js"></script>
+<script src="/nebula/js/nav.js"></script>
+<script src="/nebula/js/docs.js"></script>
+<script src="/nebula/js/search.js"></script>
+</body>
+</html>

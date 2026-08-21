@@ -14,7 +14,7 @@ local registry = {
     Float       = loadModule("core/types/Float.lua"),
     String      = loadModule("core/types/String.lua"),
     BitMask     = loadModule("core/types/BitMask.lua"),
-    Achievement = loadModule("core/types/Achievement.lua"),
+    Enum        = loadModule("core/types/Enum.lua"),
 }
 
 ---@param typeName string
