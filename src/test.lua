@@ -45,7 +45,7 @@ print(r)
 
 r[#r+1] = {
     ['equippedParts'] = {
-        [1] = 'jeep_rollcage',
+        [1] = 'jeep_nitro',
         [2] = 'jeep_jump'
     },
 }
