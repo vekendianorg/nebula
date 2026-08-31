@@ -6,13 +6,22 @@
 -- cross-referenced with known offsets from the legacy flat
 -- GameStatus.lua and account.lua ops.
 --
+-- Offsets and element layouts cross-validated against an
+-- exact-confidence struct dump of libcocos2dcpp.so
+-- (temp/libcocos2dcpp.cs, DWARF-recovered field names). Every
+-- previously verified offset matches the dump. The remaining
+-- 0xBAAD placeholders and placeholder-array element templates that
+-- were previously unmapped are filled from it and will need
+-- on-device spot checks before being treated as fully trusted.
+--
 -- offset = 0xBAAD means the offset is NOT YET KNOWN. Do not
 -- trust these fields until the placeholder is replaced by a
 -- verified static offset.
 --
 -- type = "Object" marks single nested message fields that
--- need their own elements metadata before Nebula can read/write
--- them structurally.
+-- carry their own child layouts inline (or reference a shared
+-- element template via a local). Fields without a reader yet are
+-- left with a comment noting which sub-template is still unmapped.
 --
 -- type = "Array" marks repeated fields. Use elementType = "X"
 -- for simple typed arrays (e.g. repeated string). Use elements =
@@ -39,9 +48,11 @@ local seasonResultElements = {
 local distanceHighscoreElements = {
     ["levelId"] = { offset = 0x18, type = "String" },
     ["distance"] = { offset = 0x20, type = "Float" },
-    ["previousSeasonBest"] = { offset = 0x28, type = "Float" },
+    -- 0x24/0x28 per the libcocos2dcpp dump (was 0x28/0x2C); the dump
+    -- puts previousSeasonBest directly after distance.
+    ["previousSeasonBest"] = { offset = 0x24, type = "Float" },
     ["previousSeasons"] = {
-        offset = 0x2C,
+        offset = 0x28,
         type = "Array",
         elements = seasonResultElements,
     },
@@ -51,13 +62,348 @@ local distanceHighscoreElements = {
 local timeTrialHighscoreElements = {
     ["levelId"] = { offset = 0x18, type = "String" },
     ["time"] = { offset = 0x20, type = "Float" },
-    ["previousSeasonBest"] = { offset = 0x28, type = "Float" },
+    -- 0x24/0x28 per the libcocos2dcpp dump (was 0x28/0x2C)
+    ["previousSeasonBest"] = { offset = 0x24, type = "Float" },
     ["previousSeasons"] = {
-        offset = 0x2C,
+        offset = 0x28,
         type = "Array",
         elements = seasonResultElements,
     },
     ["currentSeasonBest"] = { offset = 0x40, type = "Float" },
+}
+
+--==================================================
+-- Element templates filled from the libcocos2dcpp dump.
+-- All offsets are element-relative. Singular submessage
+-- members are POINTERS (confirmed by struct-size overlap
+-- analysis), so Object containers keep the deref convention.
+--==================================================
+
+local missionStatusFields = {
+    ["missionId"] = { offset = 0x18, type = "String" },
+    ["bestValue"] = { offset = 0x20, type = "Float" },
+    ["achievedLevel"] = { offset = 0x24, type = "Int32" },
+    ["missionDefinitionId"] = { offset = 0x28, type = "String" },
+    ["allowedVehicleIds"] = { offset = 0x30, type = "Array", elementType = "String" },
+    ["allowedWorldIds"] = { offset = 0x48, type = "Array", elementType = "String" },
+    ["allowedLevelIds"] = { offset = 0x60, type = "Array", elementType = "String" },
+    ["startingValue"] = { offset = 0x78, type = "Float" },
+}
+
+local missionStatusElements = missionStatusFields
+
+local missionStatusMapElements = {
+    ["levelId"] = { offset = 0x18, type = "String" },
+    ["missionStatus"] = { offset = 0x20, type = "Object" },
+}
+for k, v in pairs(missionStatusFields) do
+    missionStatusMapElements.missionStatus[k] = v
+end
+
+local qualifyTimeElements = {
+    ["levelId"] = { offset = 0x18, type = "String" },
+    ["time"] = { offset = 0x20, type = "Float" },
+}
+
+local racePointsElements = {
+    ["levelId"] = { offset = 0x18, type = "String" },
+    ["points"] = { offset = 0x20, type = "Int32" },
+}
+
+local upgradeStatusElements = {
+    ["upgradeId"] = { offset = 0x18, type = "String" },
+    ["level"] = { offset = 0x20, type = "Int32" },
+    ["maxLevel"] = { offset = 0x24, type = "Int32" },
+}
+
+local friendlyRaceElements = {
+    ["sessionId"] = { offset = 0x18, type = "String" },
+    ["levelId"] = { offset = 0x20, type = "String" },
+    ["friendlyRaceType"] = { offset = 0x28, type = "Int32" },
+    ["expirationTimestamp"] = { offset = 0x2C, type = "Int32" },
+    ["retryCount"] = { offset = 0x30, type = "Int32" },
+}
+
+local iapPurchaseEventElements = {
+    ["iapId"] = { offset = 0x18, type = "String" },
+    ["timestamp"] = { offset = 0x20, type = "Int32" },
+    ["validated"] = { offset = 0x24, type = "Bool" },
+    ["transactionId"] = { offset = 0x28, type = "String" },
+    ["offerId"] = { offset = 0x30, type = "String" },
+    ["recipientIds"] = { offset = 0x38, type = "Array", elementType = "String" },
+    ["validationState"] = { offset = 0x50, type = "Int32" },
+}
+
+local pendingChestElements = {
+    ["vehicleId"] = { offset = 0x18, type = "String" },
+    ["chestIndex"] = { offset = 0x20, type = "Int32" },
+    ["level"] = { offset = 0x24, type = "Int32" },
+    ["type"] = { offset = 0x28, type = "String" },
+}
+
+local rentalStatusElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["eventId"] = { offset = 0x20, type = "String" },
+    ["expiryTimestamp"] = { offset = 0x28, type = "Int32" },
+}
+
+local dealItemElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["type"] = { offset = 0x20, type = "String" },
+    ["amount"] = { offset = 0x28, type = "Int32" },
+}
+
+local dealStatusElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["purchasedItems"] = { offset = 0x20, type = "Array", elements = dealItemElements },
+    ["items"] = { offset = 0x38, type = "Array", elements = dealItemElements },
+    ["endTimestamp"] = { offset = 0x50, type = "Int32" },
+}
+
+local seasonStatusElements = {
+    ["highestRank"] = { offset = 0x18, type = "Float" },
+    ["startRank"] = { offset = 0x1C, type = "Float" },
+    ["seasonId"] = { offset = 0x20, type = "String" },
+    ["endTimestamp"] = { offset = 0x28, type = "Int32" },
+    ["ended"] = { offset = 0x2C, type = "Bool" },
+    ["premiumUnlocked"] = { offset = 0x2D, type = "Bool" },
+    ["bonusChestClaimed"] = { offset = 0x2E, type = "Bool" },
+    ["premiumProgressClaimed"] = { offset = 0x2F, type = "Bool" },
+    ["receivedRewards"] = { offset = 0x30, type = "Array", elementType = "String" },
+    ["animatedRank"] = { offset = 0x48, type = "Float" },
+    ["premiumTierUnlocked"] = { offset = 0x4C, type = "Int32" },
+}
+
+local activePopupOfferElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["endTimestamp"] = { offset = 0x20, type = "Int32" },
+    ["useAdOffer"] = { offset = 0x24, type = "Bool" },
+    ["activationCount"] = { offset = 0x28, type = "Int32" },
+    ["activationTimestamp"] = { offset = 0x2C, type = "Int32" },
+    ["originalActivationTimestamp"] = { offset = 0x30, type = "Int32" },
+}
+
+local homeCosmeticsOwnershipElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["ownedCount"] = { offset = 0x20, type = "Int32" },
+    ["usedCount"] = { offset = 0x24, type = "Int32" },
+    ["newUnlock"] = { offset = 0x28, type = "Bool" },
+}
+
+local megaAdChestItemElements = {
+    ["type"] = { offset = 0x18, type = "Int32" },
+    ["amount"] = { offset = 0x1C, type = "Int32" },
+    ["rarity"] = { offset = 0x20, type = "Int32" },
+}
+
+local megaAdChestRewardStatusElements = {
+    ["watched"] = { offset = 0x18, type = "Int32" },
+    ["watchedLastSession"] = { offset = 0x1C, type = "Int32" },
+    ["reward"] = { offset = 0x20, type = "Object" },
+    ["rewardLastSession"] = { offset = 0x28, type = "Object" },
+    ["claimed"] = { offset = 0x30, type = "Bool" },
+    ["claimedLastSession"] = { offset = 0x31, type = "Bool" },
+}
+for k, v in pairs(megaAdChestItemElements) do
+    megaAdChestRewardStatusElements.reward[k] = v
+    megaAdChestRewardStatusElements.rewardLastSession[k] = v
+end
+
+local leagueTaskElements = {
+    ["id"] = { offset = 0x18, type = "Int32" },
+    ["target"] = { offset = 0x1C, type = "Int32" },
+    ["progress"] = { offset = 0x20, type = "Int32" },
+    ["claimed"] = { offset = 0x24, type = "Bool" },
+    ["createTimestamp"] = { offset = 0x28, type = "Int32" },
+}
+
+local megaAdChestProgressDayElements = {
+    ["watched"] = { offset = 0x18, type = "Int32" },
+    ["claimed"] = { offset = 0x1C, type = "Bool" },
+    ["reward"] = { offset = 0x20, type = "Object" },
+}
+for k, v in pairs(megaAdChestItemElements) do
+    megaAdChestProgressDayElements.reward[k] = v
+end
+
+local megaAdChestProgressElements = {
+    -- rewardHash (0x18) is int64 — no Int64 reader yet
+    ["progress"] = { offset = 0x20, type = "Array", elements = megaAdChestProgressDayElements },
+}
+
+local adViewsMapElements = {
+    ["placementId"] = { offset = 0x18, type = "Int32" },
+    ["resetTimestamp"] = { offset = 0x1C, type = "Int32" },
+    ["remaining"] = { offset = 0x20, type = "Int32" },
+}
+
+local activeTriggerElements = {
+    ["timestamp"] = { offset = 0x18, type = "Int32" },
+    ["type"] = { offset = 0x1C, type = "Int32" },
+    ["vehicleId"] = { offset = 0x20, type = "String" },
+    ["level"] = { offset = 0x28, type = "Int32" },
+}
+
+local dailyTaskElements = {
+    ["type"] = { offset = 0x18, type = "Int32" },
+    ["target"] = { offset = 0x1C, type = "Int32" },
+    ["vehicle"] = { offset = 0x20, type = "String" },
+    ["level"] = { offset = 0x28, type = "String" },
+    ["completed"] = { offset = 0x30, type = "Bool" },
+    ["progress"] = { offset = 0x34, type = "Int32" },
+    ["slot"] = { offset = 0x38, type = "Int32" },
+    ["createTimestamp"] = { offset = 0x3C, type = "Int32" },
+    ["taskSpecific"] = { offset = 0x40, type = "Array", elementType = "Int32", elementStride = 0x4 },
+}
+
+local currentFriendEventElements = {
+    ["claimedRewards"] = { offset = 0x18, type = "Array", elementType = "SafeInt32" },
+    ["eventHash"] = { offset = 0x30, type = "Int32" },
+    ["hasEventPass"] = { offset = 0x34, type = "Bool" },
+    ["collectibleResetTimestamp"] = { offset = 0x38, type = "SafeInt32" },
+    ["collectibleCollected"] = { offset = 0x40, type = "SafeInt32" },
+    ["activeEventTasks"] = { offset = 0x48, type = "Array", elements = dailyTaskElements },
+    ["taskRefillsRemaining"] = { offset = 0x60, type = "Array", elementType = "Int32", elementStride = 0x4 },
+    ["singleScore"] = { offset = 0x70, type = "SafeInt32" },
+    ["tasksResetTimestamp"] = { offset = 0x78, type = "Int32" },
+    ["adsResetTimestamp"] = { offset = 0x7C, type = "Int32" },
+    ["eventId"] = { offset = 0x80, type = "String" },
+    ["teamId"] = { offset = 0x88, type = "String" },
+    ["adsRemaining"] = { offset = 0x90, type = "Int32" },
+}
+
+local banDataElements = {
+    ["bundleId"] = { offset = 0x18, type = "String" },
+    ["timestamp"] = { offset = 0x20, type = "Int32" },
+    ["oldIntValue"] = { offset = 0x24, type = "Int32" },
+    ["key"] = { offset = 0x28, type = "String" },
+    ["newIntValue"] = { offset = 0x30, type = "Int32" },
+    ["oldFloatValue"] = { offset = 0x34, type = "Float" },
+    ["oldStringValue"] = { offset = 0x38, type = "String" },
+    ["newStringValue"] = { offset = 0x40, type = "String" },
+    ["newFloatValue"] = { offset = 0x48, type = "Float" },
+}
+
+local distanceTicketElements = {
+    ["ticketId"] = { offset = 0x18, type = "String" },
+    ["amount"] = { offset = 0x20, type = "Int32" },
+    ["lastRefillTime"] = { offset = 0x24, type = "Int32" },
+    ["totalSpentAmount"] = { offset = 0x28, type = "Int32" },
+    ["videoSkipsRemaining"] = { offset = 0x2C, type = "Int32" },
+    ["nextVideoSkipTimestamp"] = { offset = 0x30, type = "Int32" },
+    ["vipSkipsRemaining"] = { offset = 0x34, type = "Int32" },
+    ["nextVipSkipTimestamp"] = { offset = 0x38, type = "Int32" },
+}
+
+local featuredChallengeElements = {
+    ["challengeId"] = { offset = 0x18, type = "String" },
+    ["expirationTimestamp"] = { offset = 0x20, type = "Int32" },
+    ["unlimitedTries"] = { offset = 0x24, type = "Bool" },
+    ["challengeWon"] = { offset = 0x25, type = "Bool" },
+    ["rewardClaimed"] = { offset = 0x26, type = "Bool" },
+    ["videoRetriesRemaining"] = { offset = 0x28, type = "Int32" },
+}
+
+local eventStatusElements = {
+    ["instanceId"] = { offset = 0x18, type = "String" },
+    ["eventId"] = { offset = 0x20, type = "String" },
+    ["expirationTimestamp"] = { offset = 0x28, type = "Int32" },
+    ["eventPoints"] = { offset = 0x2C, type = "Int32" },
+    ["collectedRewardIndexes"] = { offset = 0x30, type = "Array", elementType = "Int32", elementStride = 0x4 },
+    ["activeSessionId"] = { offset = 0x40, type = "String" },
+    ["tickets"] = { offset = 0x48, type = "Int32" },
+    ["lastTicketsRefillTime"] = { offset = 0x4C, type = "Int32" },
+    ["spentTickets"] = { offset = 0x50, type = "Int32" },
+    ["totalEventRaces"] = { offset = 0x54, type = "Int32" },
+    ["latestSessionRaces"] = { offset = 0x58, type = "Int32" },
+    ["eventPointsUnlockProgress"] = { offset = 0x5C, type = "Int32" },
+    ["teamId"] = { offset = 0x60, type = "String" },
+    -- fixedVehicleStatus (0x68) is RepeatedPtrField<VehicleStatus>;
+    -- the vehicleStatus element template lives inline on the
+    -- vehicleStatus entry below, so no reader is attached here.
+    ["eventName"] = { offset = 0x80, type = "String" },
+    ["eventButtonBackground"] = { offset = 0x88, type = "String" },
+    ["shownOfferIds"] = { offset = 0x90, type = "Array", elementType = "String" },
+    ["spentSpecialTickets"] = { offset = 0xA8, type = "Int32" },
+    ["spentEventPoints"] = { offset = 0xAC, type = "Int32" },
+    ["collectedMainRewardIndexes"] = { offset = 0xB0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+    ["collectedRotatingRewardIndexes"] = { offset = 0xC0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+    ["levelId"] = { offset = 0xD0, type = "String" },
+    ["videosWatched"] = { offset = 0xD8, type = "Int32" },
+    ["hasUnlimitedTicket"] = { offset = 0xDC, type = "Bool" },
+    ["hasScoreDoubled"] = { offset = 0xDD, type = "Bool" },
+    ["hasEventPass"] = { offset = 0xDE, type = "Bool" },
+    ["allBoosters"] = { offset = 0xE0, type = "Array", elementType = "String" },
+    ["eventPointsPrev"] = { offset = 0xF8, type = "Int32" },
+    ["totalSessionsJoined"] = { offset = 0xFC, type = "Int32" },
+    -- activeBoosters (0x100) is RepeatedPtrField<ActiveBooster> — layout not yet mapped
+    ["boosterFreeShopItems"] = { offset = 0x118, type = "Array", elementType = "String" },
+    ["randomBoosterSelection"] = { offset = 0x130, type = "Array", elementType = "String" },
+    ["activeSessionBonusVehicles"] = { offset = 0x148, type = "Array", elementType = "String" },
+    ["pendingMultichoiceChestVehicles"] = { offset = 0x160, type = "Array", elementType = "String" },
+    ["specialFeatureUpgrades"] = { offset = 0x178, type = "Array", elements = upgradeStatusElements },
+    ["collectedSpecialsRewardIndexes"] = { offset = 0x190, type = "Array", elementType = "Int32", elementStride = 0x4 },
+    ["boosterClaimedAtSession"] = { offset = 0x1A0, type = "Int32" },
+}
+
+local distanceCollectibleStatusElements = {
+    ["seasonId"] = { offset = 0x18, type = "String" },
+    -- levels (0x20) is RepeatedPtrField<LevelCollectibleStatus> — layout not yet mapped
+    ["claimedRewardLevel"] = { offset = 0x38, type = "Int32" },
+    ["totalCollectedValue"] = { offset = 0x3C, type = "Int32" },
+    ["totalValue"] = { offset = 0x40, type = "Int32" },
+    ["endTimestamp"] = { offset = 0x44, type = "Int32" },
+}
+
+local leaderboardItemDataElements = {
+    ["playerId"] = { offset = 0x18, type = "String" },
+    ["playerName"] = { offset = 0x20, type = "String" },
+    ["time"] = { offset = 0x28, type = "Float" },
+    ["distance"] = { offset = 0x2C, type = "Float" },
+    ["levelId"] = { offset = 0x30, type = "String" },
+    ["points"] = { offset = 0x38, type = "Int32" },
+    ["finishingStatus"] = { offset = 0x3C, type = "Int32" },
+    ["sessionId"] = { offset = 0x40, type = "String" },
+    ["replayId"] = { offset = 0x48, type = "String" },
+    ["flag"] = { offset = 0x50, type = "String" },
+    ["vehicleId"] = { offset = 0x58, type = "String" },
+    ["retryCount"] = { offset = 0x60, type = "Int32" },
+    ["result"] = { offset = 0x64, type = "Float" },
+    ["teamId"] = { offset = 0x68, type = "String" },
+    ["resultType"] = { offset = 0x70, type = "Int32" },
+    ["raceIndex"] = { offset = 0x74, type = "Int32" },
+}
+
+local tournamentPlayerStatusElements = {
+    ["tournamentId"] = { offset = 0x18, type = "String" },
+    ["sessionId"] = { offset = 0x20, type = "String" },
+    ["remainingAttempts"] = { offset = 0x28, type = "Array", elementType = "Int32", elementStride = 0x4 },
+}
+
+local rewardStatusElements = {
+    ["id"] = { offset = 0x18, type = "String" },
+    ["state"] = { offset = 0x20, type = "Int32" },
+    ["startTimestamp"] = { offset = 0x24, type = "Int32" },
+    ["vehicleId"] = { offset = 0x28, type = "String" },
+    ["type"] = { offset = 0x30, type = "Int32" },
+    ["target"] = { offset = 0x34, type = "Int32" },
+    ["duration"] = { offset = 0x38, type = "Int32" },
+    ["specialCupRewardTypeIndex"] = { offset = 0x3C, type = "Int32" },
+    ["slot"] = { offset = 0x40, type = "Int32" },
+    ["level"] = { offset = 0x44, type = "Int32" },
+}
+
+local homePropElements = {
+    ["typeId"] = { offset = 0x18, type = "String" },
+    ["propId"] = { offset = 0x20, type = "String" },
+    -- position (0x28) is Vector2Int (two packed int32s) — not mapped yet
+}
+
+local roomElements = {
+    ["wallId"] = { offset = 0x18, type = "String" },
+    ["floorId"] = { offset = 0x20, type = "String" },
+    ["rafterId"] = { offset = 0x28, type = "String" },
+    ["props"] = { offset = 0x30, type = "Array", elements = homePropElements },
 }
 
 return {
@@ -125,15 +471,18 @@ return {
     },
     ["completedMissions"] = {
         offset = 0x70, -- Timerise
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = missionStatusElements,
     },  -- MissionStatus
     ["activeLevelMissions"] = {
-        offset = 0x80, -- Timerise
-        type = "Array",  -- placeholder: element layout not yet mapped
+        offset = 0x88, -- was 0x80 (Timerise); dump says 0x88
+        type = "Array",
+        elements = missionStatusMapElements,
     },  -- MissionStatusMap
     ["qualifyBests"] = {
         offset = 0xA0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = qualifyTimeElements,
     },  -- QualifyTime
     ["vehicleStatus"] = {
         offset = 0xB8,
@@ -161,25 +510,25 @@ return {
                 offset = 0x50,
                 type = "Object",
                 ["levelStars"] = {
-                    offset = 0xBAAD,
+                    offset = 0x18,
                     type = "Array",
                     elements = stringIntMapElements,
                 },
                 ["levelDivisionMedals"] = {
-                    offset = 0xBAAD,
+                    offset = 0x30,
                     type = "Array",
                     elements = stringIntMapElements,
                 },
-                ["flips"] = { offset = 0xBAAD, type = "Int32" },
-                ["backflips"] = { offset = 0xBAAD, type = "Int32" },
-                ["neckflips"] = { offset = 0xBAAD, type = "Int32" },
+                ["flips"] = { offset = 0x48, type = "Int32" },
+                ["backflips"] = { offset = 0x4C, type = "Int32" },
+                ["neckflips"] = { offset = 0x50, type = "Int32" },
                 ["airtime"] = { offset = 0x54, type = "Float" },
                 ["wheelieTime"] = { offset = 0x58, type = "Float" },
-                ["racesFinished"] = { offset = 0xBAAD, type = "Int32" },
-                ["racesWon"] = { offset = 0xBAAD, type = "Int32" },
+                ["racesFinished"] = { offset = 0x5C, type = "Int32" },
+                ["racesWon"] = { offset = 0x60, type = "Int32" },
                 ["totalDistance"] = { offset= 0x64, type = "Int32" },
-                ["challengesWon"] = { offset = 0xBAAD, type = "Int32" },
-                ["featuredChallengesWon"] = { offset = 0xBAAD, type = "Int32" },
+                ["challengesWon"] = { offset = 0x68, type = "Int32" },
+                ["featuredChallengesWon"] = { offset = 0x6C, type = "Int32" },
                 ["recentUsage"] = {
                     offset = 0x70,
                     type = "Array",
@@ -209,28 +558,28 @@ return {
                 elementType = "String",
             },
             ["distanceHighscores"] = {
-                offset = 0xBAAD,
+                offset = 0x88,
                 type = "Array",
                 elements = distanceHighscoreElements,
             },
             ["timeTrialHighscores"] = {
-                offset = 0xBAAD,
+                offset = 0xA0,
                 type = "Array",
                 elements = timeTrialHighscoreElements,
             },
-            ["unlockedEquipSlotsCount"] = { offset = 0xBAAD, type = "Int32" },
+            ["unlockedEquipSlotsCount"] = { offset = 0xE8, type = "Int32" },
             ["newDistanceHighscores"] = {
                 offset = 0xB8,
                 type = "Array",
                 elements = distanceHighscoreElements,
             },
             ["newTimeTrialHighscores"] = {
-                offset = 0xBAAD,
+                offset = 0xD0,
                 type = "Array",
                 elements = timeTrialHighscoreElements,
             },
             ["distanceTarget"] = {
-                offset = 0xBAAD,
+                offset = 0xF0,
                 type = "Array",
                 elements = stringIntMapElements,
             },
@@ -264,15 +613,15 @@ return {
                 },
             },
             ["masteryXp"] = {
-                offset = 0xBAAD,
+                offset = 0x138,
                 type = "SafeInt32",
             },
             ["currentVehicleWinStreak"] = {
-                offset = 0xBAAD,
+                offset = 0x144,
                 type = "Int32",
             },
             ["bestVehicleWinStreak"] = {
-                offset = 0xBAAD,
+                offset = 0x190,
                 type = "Int32",
             },
         },
@@ -287,15 +636,18 @@ return {
     },
     ["dailyBestPoints"] = {
         offset = 0xD8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = racePointsElements,
     },  -- RacePoints
     ["tournamentRaceBests"] = {
         offset = 0xF0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = leaderboardItemDataElements,
     },  -- LeaderboardItemData
     ["activeTournaments"] = {
         offset = 0x108,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = tournamentPlayerStatusElements,
     },  -- TournamentPlayerStatus
     ["diamonds"] = {
         offset = 0x120,
@@ -323,11 +675,13 @@ return {
     },
     ["completedDailyMissions"] = {
         offset = 0x138,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = missionStatusElements,
     },  -- MissionStatus
     ["activeDailyMissions"] = {
         offset = 0x150,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = missionStatusElements,
     },  -- MissionStatus
     ["driver"] = {
         offset = 0x168,
@@ -410,8 +764,54 @@ return {
     },
     ["rewardManagerStatus"] = {
         offset = 0x1F8,
-        type = "Object"
-    },
+        type = "Object",
+        ["rewards"] = { offset = 0x18, type = "Array", elements = rewardStatusElements },
+        ["nextRewardTimestamp"] = { offset = 0x30, type = "Int32" },
+        ["nextVideoAdTimestamp"] = { offset = 0x34, type = "Int32" },
+        ["dailyToolbox"] = {
+            offset = 0x38,
+            type = "Object",
+            ["state"] = { offset = 0x18, type = "Int32" },
+            ["startTimestamp"] = { offset = 0x1C, type = "Int32" },
+            ["progress"] = { offset = 0x20, type = "Int32" },
+        },
+        ["nextFreeChestTimestamp"] = { offset = 0x40, type = "Int32" },
+        ["videoSkipSpecialCupsRemaining"] = { offset = 0x44, type = "Int32" },
+        ["nextVideoSkipsTimestamp"] = { offset = 0x48, type = "Int32" },
+        ["currentSpecialCupRewardIndex"] = { offset = 0x4C, type = "Int32" },
+        ["distanceRewards"] = { offset = 0x50, type = "Array", elements = rewardStatusElements },
+        ["videoSkipScrapperRemaining"] = { offset = 0x68, type = "Int32" },
+        ["nextVideoSkipScrapperTimestamp"] = { offset = 0x6C, type = "Int32" },
+        ["videoSkipTeamEventTicketsRemaining"] = { offset = 0x70, type = "Int32" },
+        ["nextVideoSkipTeamEventTicketTimestamp"] = { offset = 0x74, type = "Int32" },
+        ["videoSkipEventTicketsRemaining"] = { offset = 0x78, type = "Int32" },
+        ["nextVideoSkipEventTicketTimestamp"] = { offset = 0x7C, type = "Int32" },
+        ["nextVideoChestTimestamp"] = { offset = 0x80, type = "Int32" },
+        ["distanceVideoRewardsRemaining"] = { offset = 0x84, type = "Int32" },
+        ["videoMultipliedCoinsCollected"] = { offset = 0x88, type = "Int32" },
+        ["nextVideoCoinMultiplierTimestamp"] = { offset = 0x8C, type = "Int32" },
+        ["activeDistanceReward"] = {
+            offset = 0x90,
+            type = "Object",
+            ["id"] = { offset = 0x18, type = "String" },
+            ["state"] = { offset = 0x20, type = "Int32" },
+            ["startTimestamp"] = { offset = 0x24, type = "Int32" },
+            ["vehicleId"] = { offset = 0x28, type = "String" },
+            ["type"] = { offset = 0x30, type = "Int32" },
+            ["target"] = { offset = 0x34, type = "Int32" },
+            ["duration"] = { offset = 0x38, type = "Int32" },
+            ["specialCupRewardTypeIndex"] = { offset = 0x3C, type = "Int32" },
+            ["slot"] = { offset = 0x40, type = "Int32" },
+            ["level"] = { offset = 0x44, type = "Int32" },
+        },
+        ["distanceRewardsRemaining"] = { offset = 0x98, type = "Int32" },
+        ["nextDistanceRewardsTimestamp"] = { offset = 0x9C, type = "Int32" },
+        ["videoDoubleEventPointsRemaining"] = { offset = 0xA0, type = "Int32" },
+        ["nextVideoDoubleEventPointsTimestamp"] = { offset = 0xA4, type = "Int32" },
+        ["previousConsumedXPromo"] = { offset = 0xA8, type = "String" },
+        ["chestRandomCounter"] = { offset = 0xB0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["videoChestsRemaining"] = { offset = 0xC0, type = "Int32" },
+    },  -- RewardManagerStatus
     ["maxWCRank"] = {
         offset = 0x200,
         type = "Float"
@@ -491,7 +891,8 @@ return {
     },
     ["activeFriendlyRaces"] = {
         offset = 0x2A8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = friendlyRaceElements,
     },  -- FriendlyRace
     ["cheater"] = {
         offset = 0x3DD,
@@ -502,11 +903,11 @@ return {
         type = "String"
     },
     ["deviceSignature"] = {
-        offset = 0xBAAD,
+        offset = 0x2C8,
         type = "String"
     },
     ["deviceHash"] = {
-        offset = 0x2C8,
+        offset = 0x2D0, -- was 0x2C8; dump: devicesignature_ 0x2c8, devicehash_ 0x2d0
         type = "String"
     },
     ["currentSpecialEventId"] = {
@@ -519,11 +920,23 @@ return {
     },
     ["seasonStatus"] = {
         offset = 0x2E0,
-        type = "Object"
+        type = "Object",
+        ["highestRank"] = { offset = 0x18, type = "Float" },
+        ["startRank"] = { offset = 0x1C, type = "Float" },
+        ["seasonId"] = { offset = 0x20, type = "String" },
+        ["endTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["ended"] = { offset = 0x2C, type = "Bool" },
+        ["premiumUnlocked"] = { offset = 0x2D, type = "Bool" },
+        ["bonusChestClaimed"] = { offset = 0x2E, type = "Bool" },
+        ["premiumProgressClaimed"] = { offset = 0x2F, type = "Bool" },
+        ["receivedRewards"] = { offset = 0x30, type = "Array", elementType = "String" },
+        ["animatedRank"] = { offset = 0x48, type = "Float" },
+        ["premiumTierUnlocked"] = { offset = 0x4C, type = "Int32" },
     },  -- SeasonStatus
     ["purchasedIaps"] = {
         offset = 0x2E8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = iapPurchaseEventElements,
     },  -- IapPurchaseEvent
     ["acsPlayerGuid"] = {
         offset = 0x308,
@@ -551,7 +964,46 @@ return {
     },
     ["activeEventStatus"] = {
         offset = 0x320,
-        type = "Object"
+        type = "Object",
+        ["instanceId"] = { offset = 0x18, type = "String" },
+        ["eventId"] = { offset = 0x20, type = "String" },
+        ["expirationTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["eventPoints"] = { offset = 0x2C, type = "Int32" },
+        ["collectedRewardIndexes"] = { offset = 0x30, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["activeSessionId"] = { offset = 0x40, type = "String" },
+        ["tickets"] = { offset = 0x48, type = "Int32" },
+        ["lastTicketsRefillTime"] = { offset = 0x4C, type = "Int32" },
+        ["spentTickets"] = { offset = 0x50, type = "Int32" },
+        ["totalEventRaces"] = { offset = 0x54, type = "Int32" },
+        ["latestSessionRaces"] = { offset = 0x58, type = "Int32" },
+        ["eventPointsUnlockProgress"] = { offset = 0x5C, type = "Int32" },
+        ["teamId"] = { offset = 0x60, type = "String" },
+        -- fixedVehicleStatus (0x68) is RepeatedPtrField<VehicleStatus>;
+        -- the vehicleStatus element template lives inline on the
+        -- vehicleStatus entry above, so no reader is attached here.
+        ["eventName"] = { offset = 0x80, type = "String" },
+        ["eventButtonBackground"] = { offset = 0x88, type = "String" },
+        ["shownOfferIds"] = { offset = 0x90, type = "Array", elementType = "String" },
+        ["spentSpecialTickets"] = { offset = 0xA8, type = "Int32" },
+        ["spentEventPoints"] = { offset = 0xAC, type = "Int32" },
+        ["collectedMainRewardIndexes"] = { offset = 0xB0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["collectedRotatingRewardIndexes"] = { offset = 0xC0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["levelId"] = { offset = 0xD0, type = "String" },
+        ["videosWatched"] = { offset = 0xD8, type = "Int32" },
+        ["hasUnlimitedTicket"] = { offset = 0xDC, type = "Bool" },
+        ["hasScoreDoubled"] = { offset = 0xDD, type = "Bool" },
+        ["hasEventPass"] = { offset = 0xDE, type = "Bool" },
+        ["allBoosters"] = { offset = 0xE0, type = "Array", elementType = "String" },
+        ["eventPointsPrev"] = { offset = 0xF8, type = "Int32" },
+        ["totalSessionsJoined"] = { offset = 0xFC, type = "Int32" },
+        -- activeBoosters (0x100) is RepeatedPtrField<ActiveBooster> — layout not yet mapped
+        ["boosterFreeShopItems"] = { offset = 0x118, type = "Array", elementType = "String" },
+        ["randomBoosterSelection"] = { offset = 0x130, type = "Array", elementType = "String" },
+        ["activeSessionBonusVehicles"] = { offset = 0x148, type = "Array", elementType = "String" },
+        ["pendingMultichoiceChestVehicles"] = { offset = 0x160, type = "Array", elementType = "String" },
+        ["specialFeatureUpgrades"] = { offset = 0x178, type = "Array", elements = upgradeStatusElements },
+        ["collectedSpecialsRewardIndexes"] = { offset = 0x190, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["boosterClaimedAtSession"] = { offset = 0x1A0, type = "Int32" },
     },  -- EventStatus
     ["flags"] = {
         offset = 0x328,
@@ -595,7 +1047,8 @@ return {
     },
     ["pendingChests"] = {
         offset = 0x390,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = pendingChestElements,
     },  -- PendingChest
     ["libHash"] = {
         offset = 0x3B0,
@@ -615,7 +1068,8 @@ return {
         ["nextVipSkipTeamEventTicketTimeStamp"] = { offset = 0x44, type = "Int32" },
         ["vipSkipEventTicketsRemaining"] = { offset = 0x48, type = "Int32" },
         ["nextVipSkipEventTicketTimeStamp"] = { offset = 0x4C, type = "Int32" },
-        ["manuallyEnabled"] = { offset = 0x2E, type = "Bool" }
+        ["hasBeenVipBefore"] = { offset = 0x2E, type = "Bool" },
+        ["manuallyEnabled"] = { offset = 0x50, type = "Bool" } -- was 0x2E; dump: hasbeenvipbefore_ 0x2e, manuallyenabled_ 0x50
     },
     ["totalEventsJoined"] = {
         offset = 0x3B4,
@@ -651,7 +1105,8 @@ return {
     },
     ["rentedVehicles"] = {
         offset = 0x3E0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = rentalStatusElements,
     },  -- RentalStatus
     ["unlockedWorlds"] = {
         offset = 0x3F8,
@@ -668,7 +1123,18 @@ return {
     },
     ["checkinReward"] = {
         offset = 0x420,
-        type = "Object"
+        type = "Object",
+        ["id"] = { offset = 0x18, type = "String" },
+        ["rewardIndex"] = { offset = 0x20, type = "Int32" },
+        ["lastCollectedTimestamp"] = { offset = 0x24, type = "Int32" },
+        ["startTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["endTimestamp"] = { offset = 0x2C, type = "Int32" },
+        ["claimedRewards"] = { offset = 0x30, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["allowDaySkip"] = { offset = 0x40, type = "Bool" },
+        ["updateRewardIndexAfterSkip"] = { offset = 0x41, type = "Bool" },
+        ["minCollectInterval"] = { offset = 0x44, type = "Int32" },
+        ["maxCollectInterval"] = { offset = 0x48, type = "Int32" },
+        ["shuffleKey"] = { offset = 0x4C, type = "Int32" },
     },  -- CheckinReward
     ["seasonRank"] = {
         offset = 0x428,
@@ -696,7 +1162,8 @@ return {
     },
     ["deals"] = {
         offset = 0x440,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = dealStatusElements,
     },  -- DealStatus
     ["scrap"] = {
         offset = 0x45C,
@@ -704,7 +1171,12 @@ return {
     },
     ["scrapperStatus"] = {
         offset = 0x460,
-        type = "Object"
+        type = "Object",
+        ["readyTimestamp"] = { offset = 0x18, type = "Int32" },
+        ["partsIn"] = { offset = 0x1C, type = "Int32" },
+        ["scrapOut"] = { offset = 0x20, type = "Int32" },
+        ["isUnlocked"] = { offset = 0x24, type = "Bool" },
+        ["isExcessTutorialShown"] = { offset = 0x25, type = "Bool" },
     },  -- ScrapperStatus
     ["totalScrapEarned"] = {
         offset = 0x480,
@@ -712,7 +1184,8 @@ return {
     },
     ["oldSeasons"] = {
         offset = 0x468,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = seasonStatusElements,
     },  -- SeasonStatus
     ["targetedAdsConsent"] = {
         offset = 0x484,
@@ -724,15 +1197,65 @@ return {
     },
     ["activePopupOffers"] = {
         offset = 0x488,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = activePopupOfferElements,
     },  -- ActivePopupOffer
     ["activeTeamEventStatus"] = {
         offset = 0x4A0,
-        type = "Object"
+        type = "Object",
+        ["instanceId"] = { offset = 0x18, type = "String" },
+        ["eventId"] = { offset = 0x20, type = "String" },
+        ["expirationTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["eventPoints"] = { offset = 0x2C, type = "Int32" },
+        ["collectedRewardIndexes"] = { offset = 0x30, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["activeSessionId"] = { offset = 0x40, type = "String" },
+        ["tickets"] = { offset = 0x48, type = "Int32" },
+        ["lastTicketsRefillTime"] = { offset = 0x4C, type = "Int32" },
+        ["spentTickets"] = { offset = 0x50, type = "Int32" },
+        ["totalEventRaces"] = { offset = 0x54, type = "Int32" },
+        ["latestSessionRaces"] = { offset = 0x58, type = "Int32" },
+        ["eventPointsUnlockProgress"] = { offset = 0x5C, type = "Int32" },
+        ["teamId"] = { offset = 0x60, type = "String" },
+        -- fixedVehicleStatus (0x68) is RepeatedPtrField<VehicleStatus>;
+        -- the vehicleStatus element template lives inline on the
+        -- vehicleStatus entry above, so no reader is attached here.
+        ["eventName"] = { offset = 0x80, type = "String" },
+        ["eventButtonBackground"] = { offset = 0x88, type = "String" },
+        ["shownOfferIds"] = { offset = 0x90, type = "Array", elementType = "String" },
+        ["spentSpecialTickets"] = { offset = 0xA8, type = "Int32" },
+        ["spentEventPoints"] = { offset = 0xAC, type = "Int32" },
+        ["collectedMainRewardIndexes"] = { offset = 0xB0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["collectedRotatingRewardIndexes"] = { offset = 0xC0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["levelId"] = { offset = 0xD0, type = "String" },
+        ["videosWatched"] = { offset = 0xD8, type = "Int32" },
+        ["hasUnlimitedTicket"] = { offset = 0xDC, type = "Bool" },
+        ["hasScoreDoubled"] = { offset = 0xDD, type = "Bool" },
+        ["hasEventPass"] = { offset = 0xDE, type = "Bool" },
+        ["allBoosters"] = { offset = 0xE0, type = "Array", elementType = "String" },
+        ["eventPointsPrev"] = { offset = 0xF8, type = "Int32" },
+        ["totalSessionsJoined"] = { offset = 0xFC, type = "Int32" },
+        -- activeBoosters (0x100) is RepeatedPtrField<ActiveBooster> — layout not yet mapped
+        ["boosterFreeShopItems"] = { offset = 0x118, type = "Array", elementType = "String" },
+        ["randomBoosterSelection"] = { offset = 0x130, type = "Array", elementType = "String" },
+        ["activeSessionBonusVehicles"] = { offset = 0x148, type = "Array", elementType = "String" },
+        ["pendingMultichoiceChestVehicles"] = { offset = 0x160, type = "Array", elementType = "String" },
+        ["specialFeatureUpgrades"] = { offset = 0x178, type = "Array", elements = upgradeStatusElements },
+        ["collectedSpecialsRewardIndexes"] = { offset = 0x190, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["boosterClaimedAtSession"] = { offset = 0x1A0, type = "Int32" },
     },  -- EventStatus
     ["teamStatus"] = {
         offset = 0x4B0,
-        type = "Object"
+        type = "Object",
+        ["collectedTeamChests"] = { offset = 0x18, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["joinedToTeamTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["pendingTeamChestContribution"] = { offset = 0x2C, type = "Float" },
+        ["numberOfTeamJoins"] = { offset = 0x30, type = "Int32" },
+        ["numberOfKickedOut"] = { offset = 0x34, type = "Int32" },
+        ["reportedMessages"] = { offset = 0x38, type = "Array", elementType = "String" },
+        ["currentTeamDonations"] = { offset = 0x50, type = "SafeInt32" },
+        ["collectedTeamBossChests"] = { offset = 0x58, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["waitingJoinLeaveResponse"] = { offset = 0x68, type = "Bool" },
+        ["waitingCreateResponse"] = { offset = 0x69, type = "Bool" },
     },  -- TeamStatus
     ["specialTickets"] = {
         offset = 0x4AC,
@@ -748,7 +1271,11 @@ return {
     },
     ["kickedTeamStatus"] = {
         offset = 0x4C0,
-        type = "Object"
+        type = "Object",
+        ["teamEventId"] = { offset = 0x18, type = "String" },
+        ["teamId"] = { offset = 0x20, type = "String" },
+        ["sessionId"] = { offset = 0x28, type = "String" },
+        ["teamTicketsRefillTime"] = { offset = 0x30, type = "Int32" },
     },  -- KickedTeamStatus
     ["teamEventOfferShown"] = {
         offset = 0x4C8,
@@ -765,11 +1292,13 @@ return {
     },
     ["distanceTickets"] = {
         offset = 0x4D8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = distanceTicketElements,
     },  -- DistanceTicket
     ["previousEventStatuses"] = {
         offset = 0x4F8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = eventStatusElements,
     },  -- EventStatus
     ["garagePower"] = {
         offset = 0x4F4,
@@ -796,6 +1325,7 @@ return {
         offset = 0x530,
         type = "Array",
         elementType = "Int32",
+        elementStride = 0x4, -- RepeatedField<int> packs elements at 4 bytes
     },
     ["secret"] = {
         offset = 0x540,
@@ -807,7 +1337,8 @@ return {
     },
     ["banData"] = {
         offset = 0x548,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = banDataElements,
     },  -- BanData
     ["banReviewed"] = {
         offset = 0x3DF,
@@ -815,7 +1346,16 @@ return {
     },
     ["teamSeasonStatus"] = {
         offset = 0x560,
-        type = "Object"
+        type = "Object",
+        ["seasonId"] = { offset = 0x18, type = "String" },
+        ["division"] = { offset = 0x20, type = "Int32" },
+        ["rank"] = { offset = 0x24, type = "Float" },
+        ["previousOpponents"] = { offset = 0x28, type = "Array", elementType = "String" },
+        ["startTimestamp"] = { offset = 0x40, type = "Int32" },
+        ["endTimestamp"] = { offset = 0x44, type = "Int32" },
+        ["finalPlacement"] = { offset = 0x48, type = "Int32" },
+        ["subdivision"] = { offset = 0x4C, type = "Int32" },
+        ["teamSupportLevel"] = { offset = 0x50, type = "Int32" },
     },  -- TeamSeasonStatus
     ["nonRewardedTeamSeasons"] = {
         offset = 0x570,
@@ -824,11 +1364,13 @@ return {
     },
     ["activeDailyBonusTasks"] = {
         offset = 0x588,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = dailyTaskElements,
     },  -- DailyTask
     ["activeDailyTasks"] = {
         offset = 0x5A0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = dailyTaskElements,
     },  -- DailyTask
     ["nextDailyTaskTimeStamp"] = {
         offset = 0x56C,
@@ -856,12 +1398,14 @@ return {
     },
     ["pendingOfferIds"] = {
         offset = 0x5D0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = iapPurchaseEventElements,
     },  -- IapPurchaseEvent
     ["dailyTaskRefillsRemaining"] = {
         offset = 0x5E8,
         type = "Array",
         elementType = "Int32",
+        elementStride = 0x4, -- RepeatedField<int> packs elements at 4 bytes
     },
     ["currencies"] = {
         offset = 0x5F8,
@@ -885,7 +1429,8 @@ return {
     },
     ["featuredChallenges"] = {
         offset = 0x628,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = featuredChallengeElements,
     },  -- FeaturedChallenge
     ["featuredChallengeIndex"] = {
         offset = 0x640,
@@ -905,11 +1450,51 @@ return {
     },
     ["distanceCollectibles"] = {
         offset = 0x648,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = distanceCollectibleStatusElements,
     },  -- DistanceCollectibleStatus
     ["activeCommunityEventStatus"] = {
         offset = 0x660,
-        type = "Object"
+        type = "Object",
+        ["instanceId"] = { offset = 0x18, type = "String" },
+        ["eventId"] = { offset = 0x20, type = "String" },
+        ["expirationTimestamp"] = { offset = 0x28, type = "Int32" },
+        ["eventPoints"] = { offset = 0x2C, type = "Int32" },
+        ["collectedRewardIndexes"] = { offset = 0x30, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["activeSessionId"] = { offset = 0x40, type = "String" },
+        ["tickets"] = { offset = 0x48, type = "Int32" },
+        ["lastTicketsRefillTime"] = { offset = 0x4C, type = "Int32" },
+        ["spentTickets"] = { offset = 0x50, type = "Int32" },
+        ["totalEventRaces"] = { offset = 0x54, type = "Int32" },
+        ["latestSessionRaces"] = { offset = 0x58, type = "Int32" },
+        ["eventPointsUnlockProgress"] = { offset = 0x5C, type = "Int32" },
+        ["teamId"] = { offset = 0x60, type = "String" },
+        -- fixedVehicleStatus (0x68) is RepeatedPtrField<VehicleStatus>;
+        -- the vehicleStatus element template lives inline on the
+        -- vehicleStatus entry above, so no reader is attached here.
+        ["eventName"] = { offset = 0x80, type = "String" },
+        ["eventButtonBackground"] = { offset = 0x88, type = "String" },
+        ["shownOfferIds"] = { offset = 0x90, type = "Array", elementType = "String" },
+        ["spentSpecialTickets"] = { offset = 0xA8, type = "Int32" },
+        ["spentEventPoints"] = { offset = 0xAC, type = "Int32" },
+        ["collectedMainRewardIndexes"] = { offset = 0xB0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["collectedRotatingRewardIndexes"] = { offset = 0xC0, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["levelId"] = { offset = 0xD0, type = "String" },
+        ["videosWatched"] = { offset = 0xD8, type = "Int32" },
+        ["hasUnlimitedTicket"] = { offset = 0xDC, type = "Bool" },
+        ["hasScoreDoubled"] = { offset = 0xDD, type = "Bool" },
+        ["hasEventPass"] = { offset = 0xDE, type = "Bool" },
+        ["allBoosters"] = { offset = 0xE0, type = "Array", elementType = "String" },
+        ["eventPointsPrev"] = { offset = 0xF8, type = "Int32" },
+        ["totalSessionsJoined"] = { offset = 0xFC, type = "Int32" },
+        -- activeBoosters (0x100) is RepeatedPtrField<ActiveBooster> — layout not yet mapped
+        ["boosterFreeShopItems"] = { offset = 0x118, type = "Array", elementType = "String" },
+        ["randomBoosterSelection"] = { offset = 0x130, type = "Array", elementType = "String" },
+        ["activeSessionBonusVehicles"] = { offset = 0x148, type = "Array", elementType = "String" },
+        ["pendingMultichoiceChestVehicles"] = { offset = 0x160, type = "Array", elementType = "String" },
+        ["specialFeatureUpgrades"] = { offset = 0x178, type = "Array", elements = upgradeStatusElements },
+        ["collectedSpecialsRewardIndexes"] = { offset = 0x190, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["boosterClaimedAtSession"] = { offset = 0x1A0, type = "Int32" },
     },  -- EventStatus
     ["currentPublicLevels"] = {
         offset = 0x668,
@@ -927,27 +1512,38 @@ return {
     },
     ["home"] = {
         offset = 0x6A0,
-        type = "Object"
+        type = "Object",
+        ["rooms"] = { offset = 0x18, type = "Array", elements = roomElements },
     },  -- Home
     ["ownedHomeProps"] = {
         offset = 0x6B0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = homeCosmeticsOwnershipElements,
     },  -- HomeCosmeticsOwnership
     ["ownedHomeBackgrounds"] = {
         offset = 0x6C8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = homeCosmeticsOwnershipElements,
     },  -- HomeCosmeticsOwnership
     ["megaAdChestRewards"] = {
         offset = 0x6E0,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = megaAdChestRewardStatusElements,
     },  -- MegaAdChestRewardStatus
     ["activeLeagueTasks"] = {
         offset = 0x6F8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = leagueTaskElements,
     },  -- LeagueTask
     ["communityEvent"] = {
         offset = 0x710,
-        type = "Object"
+        type = "Object",
+        ["seasonId"] = { offset = 0x18, type = "String" },
+        ["results"] = { offset = 0x20, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["oldSeasons"] = { offset = 0x30, type = "Array", elements = stringIntMapElements },
+        ["levelIds"] = { offset = 0x48, type = "Array", elementType = "String" },
+        ["levelTimestamps"] = { offset = 0x60, type = "Array", elements = stringIntMapElements },
+        ["eventPoints"] = { offset = 0x78, type = "Int32" },
     },
     ["masteryBonusXp"] = {
         offset = 0x718,
@@ -1019,7 +1615,8 @@ return {
     },
     ["megaAdChestProgress"] = {
         offset = 0x788,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = megaAdChestProgressElements,
     },  -- MegaAdChestProgress
     ["signatureChallengeId"] = {
         offset = 0x7A0,
@@ -1031,7 +1628,8 @@ return {
     },
     ["adviews"] = {
         offset = 0x7A8,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = adViewsMapElements,
     },  -- AdViewsMap
     ["premiumTierWCUnlocked"] = {
         offset = 0x7C4,
@@ -1043,7 +1641,15 @@ return {
     },
     ["currentGachaProgress"] = {
         offset = 0x7C8,
-        type = "Object"
+        type = "Object",
+        ["pendingReward"] = { offset = 0x18, type = "SafeInt32" },
+        ["eventHash"] = { offset = 0x20, type = "Int32" },
+        ["totalSpins"] = { offset = 0x24, type = "Int32" },
+        ["claimedRewards"] = { offset = 0x28, type = "Array", elementType = "SafeInt32" },
+        ["claimedBonusRewards"] = { offset = 0x40, type = "SafeInt32" },
+        ["adSpinDay"] = { offset = 0x48, type = "SafeInt32" },
+        ["dailyAdSpins"] = { offset = 0x50, type = "SafeInt32" },
+        ["safeTotalSpins"] = { offset = 0x58, type = "SafeInt32" },
     },  -- CurrentGachaProgress
     ["claimedResearchRewardAmount"] = {
         offset = 0x7D0,
@@ -1056,7 +1662,20 @@ return {
     },
     ["currentFriendEvent"] = {
         offset = 0x7F0,
-        type = "Object"
+        type = "Object",
+        ["claimedRewards"] = { offset = 0x18, type = "Array", elementType = "SafeInt32" },
+        ["eventHash"] = { offset = 0x30, type = "Int32" },
+        ["hasEventPass"] = { offset = 0x34, type = "Bool" },
+        ["collectibleResetTimestamp"] = { offset = 0x38, type = "SafeInt32" },
+        ["collectibleCollected"] = { offset = 0x40, type = "SafeInt32" },
+        ["activeEventTasks"] = { offset = 0x48, type = "Array", elements = dailyTaskElements },
+        ["taskRefillsRemaining"] = { offset = 0x60, type = "Array", elementType = "Int32", elementStride = 0x4 },
+        ["singleScore"] = { offset = 0x70, type = "SafeInt32" },
+        ["tasksResetTimestamp"] = { offset = 0x78, type = "Int32" },
+        ["adsResetTimestamp"] = { offset = 0x7C, type = "Int32" },
+        ["eventId"] = { offset = 0x80, type = "String" },
+        ["teamId"] = { offset = 0x88, type = "String" },
+        ["adsRemaining"] = { offset = 0x90, type = "Int32" },
     },  -- CurrentFriendEvent
     ["teamDonationTrack"] = {
         offset = 0x808,
@@ -1066,6 +1685,7 @@ return {
         offset = 0x7F8,
         type = "Array",
         elementType = "Int32",
+        elementStride = 0x4, -- RepeatedField<int> packs elements at 4 bytes
     },
     ["teamSupportChestTransactions"] = {
         offset = 0x810,
@@ -1128,34 +1748,46 @@ return {
         offset = 0x870,
         optional = true,
         tracked = true,
-        type = "Object"
+        type = "Object",
+        ["cupCounter"] = { offset = 0x18, type = "SafeInt32" },
+        ["endTime"] = { offset = 0x20, type = "SafeInt32" },
+        ["startStreak"] = { offset = 0x28, type = "SafeInt32" },
+        ["claimedRewards"] = { offset = 0x30, type = "Array", elementType = "SafeInt32" },
+        ["vehicleId"] = { offset = 0x48, type = "String" },
+        ["rewards"] = { offset = 0x50, type = "Array", elementType = "SafeInt32" },
+        ["cooldownTime"] = { offset = 0x68, type = "SafeInt32" },
+        ["active"] = { offset = 0x70, type = "Bool" },
+        ["pendingEnd"] = { offset = 0x71, type = "Bool" },
     }, --WinStreakEvent
     ["activeTriggers"] = {
         id = "activeTriggers",
         offset = 0x878,
         optional = false,
         tracked = true,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = activeTriggerElements,
     }, -- ActiveTrigger
     ["previousPlayerIds"] = {
         id = "previousPlayerIds",
         offset = 0x890,
         optional = true,
         tracked = true,
-        type = "Object"
-    }, -- String
+        type = "Array",
+        elementType = "String",
+    }, -- String (was Object; dump: RepeatedPtrField<string>)
     ["currentFriendEvents"] = {
         id = "currentFriendEvents",
         offset = 0x8A8,
         optional = false,
         tracked = true,
-        type = "Array",  -- placeholder: element layout not yet mapped
+        type = "Array",
+        elements = currentFriendEventElements,
     }, -- CurrentFriendEvent
     ["nextBonusLevelRank"] = {
         id = "nextBonusLevelRank",
         offset = 0x8C0,
         optional = true,
         tracked = true,
-        type = "Object"
+        type = "Float" -- was Object; dump: float nextbonuslevelrank_
     },
 }

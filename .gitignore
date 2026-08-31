@@ -1,0 +1,4 @@
+# temp/ — scratch analysis, struct dumps, and validation scratch files
+# (libcocos2dcpp.cs, lua_struct_check.ps1, _bodies*.txt, etc.).
+# Never commit these; they are regenerated locally.
+temp/

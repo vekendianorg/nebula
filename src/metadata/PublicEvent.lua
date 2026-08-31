@@ -340,7 +340,7 @@ return {
             type = "Int32"
         },
         ["gameMode"] = {
-            offset = 0xBAAD,
+            offset = 0x198,
             type = "String"
         },
         ["maxSessionParticipants"] = {
@@ -348,6 +348,9 @@ return {
             type = "Int32"
         },
         ["maxBotCount"] = {
+            -- NOT FOUND in GameModeDefinition dump. Field does not exist
+            -- between maxSessionParticipants (0x138) and initialFuelTank (0x13c).
+            -- May have been removed or renamed. Do not trust.
             offset = 0xBAAD,
             type = "Int32"
         },
@@ -369,11 +372,11 @@ return {
         },
         ["levelPool"] = {
             ["poolOrder"] = {
-                offset = 0xBAAD,
+                offset = 0x2E8,
                 type = "String"
             },
             ["levelOrder"] = {
-                offset = 0xBAAD,
+                offset = 0x2EC,
                 type = "String"
             },
             ["levelPools"] = {
@@ -397,7 +400,7 @@ return {
                 type = "String"
             },
             ["type"] = {
-                offset = 0xBAAD,
+                offset = 0x3C0,
                 type = "String"
             },
             ["gemsToPointsConversion"] = {
