@@ -270,7 +270,7 @@ return {
         offset = 0x50,
         type = "Array",
         elementType = "String",
-        elementStride = 0x18
+        elementStride = 0x18 -- std::vector<std::string>, inline elements
     },
     ["eventIcon"] = {
         offset = 0x80,
@@ -345,16 +345,13 @@ return {
         },
         ["gameMode"] = {
             offset = 0x198,
-            type = "String"
+            type = "Int32" -- GameMode enum
         },
         ["maxSessionParticipants"] = {
             offset = 0x2D0,
             type = "Int32"
         },
         ["maxBotCount"] = {
-            -- NOT FOUND in GameModeDefinition dump. Field does not exist
-            -- between maxSessionParticipants (0x138) and initialFuelTank (0x13c).
-            -- May have been removed or renamed. Do not trust.
             -- NOT FOUND in GameModeDefinition dump. Field does not exist
             -- between maxSessionParticipants (0x138) and initialFuelTank (0x13c).
             -- May have been removed or renamed. Do not trust.
@@ -375,27 +372,29 @@ return {
             offset = 0x470,
             type = "Array",
             elementType = "String",
-            elementStride = 0x18
+            elementStride = 0x18 -- std::vector<std::string>, inline elements
         },
         ["levelPool"] = {
             ["poolOrder"] = {
                 offset = 0x2E8,
-                type = "String"
+                type = "Int32" -- LevelPoolType enum
             },
             ["levelOrder"] = {
                 offset = 0x2EC,
-                type = "String"
+                type = "Int32" -- LevelPoolType enum
             },
             ["levelPools"] = {
                 offset = 0x2F0,
                 type = "Array",
+                -- std::vector<std::vector<std::string>>: outer elements
+                -- are vector<string> objects (0x18 each), inline
                 elementStride = 0x18,
                 elements = {
                     ["levels"] = {
                         offset = 0x0,
                         type = "Array",
                         elementType = "String",
-                        elementStride = 0x18
+                        elementStride = 0x18 -- inline std::string elements
                     }
                 }
             }
@@ -404,11 +403,11 @@ return {
             offset = 0x3E0,
             ["function"] = {
                 offset = 0x400,
-                type = "String"
+                type = "Object" -- ValueSequence<float>, no reader yet
             },
             ["type"] = {
                 offset = 0x3C0,
-                type = "String"
+                type = "Int32" -- PointsSystemType enum
             },
             ["gemsToPointsConversion"] = {
                 offset = 0x3F0,
@@ -428,8 +427,30 @@ return {
     ["fixedVehicles"] = {
         offset = 0x4A0,
         type = "Array",
-        elementType = "String",
-        elementStride = 0x18
+        -- std::vector<FixedVehicleDefinition> (Size 0x118), inline
+        elementStride = 0x118,
+        elements = {
+            ["id"] = {
+                offset = 0x0,
+                type = "String"
+            },
+            ["levelUpsPerPurchase"] = {
+                offset = 0xE0,
+                type = "Int32"
+            },
+            ["tuningPartSlots"] = {
+                offset = 0xE4,
+                type = "Int32"
+            },
+            ["eventPointsToUnlock"] = {
+                offset = 0x110,
+                type = "Int32"
+            },
+            ["allowCustomization"] = {
+                offset = 0x114,
+                type = "Bool"
+            }
+        }
     },
     ["specialFeatures"] = {
         offset = 0x4D0,

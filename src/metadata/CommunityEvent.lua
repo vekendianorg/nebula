@@ -112,13 +112,15 @@ return {
         ["levelPools"] = {
             offset = 0x2F0,
             type = "Array",
+            -- std::vector<std::vector<std::string>>: outer elements
+            -- are vector<string> objects (0x18 each), inline
             elementStride = 0x18,
             elements = {
                 ["levels"] = {
                     offset = 0x0,
                     type = "Array",
                     elementType = "String",
-                    elementStride = 0x18
+                    elementStride = 0x18 -- inline std::string elements
                 }
             }
         },

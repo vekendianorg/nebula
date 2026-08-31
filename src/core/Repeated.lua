@@ -214,7 +214,7 @@ values[i] = impl.get(elementPtr, f)
                     values[i] = false
                 end
             end
-        elseif elementType == "String" then
+        elseif elementType == "String" and stride == DEFAULT_STRIDE then
             local slots, slotErr = readSlotPointers(header, header.size, DEFAULT_STRIDE)
             if not slots then
                 return nil, slotErr
@@ -472,7 +472,7 @@ if field.elementType then
                     end
                 end
             end
-        elseif elementType == "String" then
+        elseif elementType == "String" and stride == DEFAULT_STRIDE then
             local oldSize = header.size or 0
             local slots
             if oldSize > 0 then
@@ -513,7 +513,12 @@ if field.elementType then
         else
             for i = 1, newSize do
                 local f = { offset = (i - 1) * stride, type = elementType }
-                f = shadowString(f, field.stringDirect)
+                if elementType == "String" then
+                    -- Inline std::string elements are always direct.
+                    f.indirect = false
+                else
+                    f = shadowString(f, field.stringDirect)
+                end
                 if impl.collectWrite then
                     local cw = {}
                     if not impl.collectWrite(header.arrayPtr, f, values[i], cw) then
@@ -692,7 +697,7 @@ if field.elementType then
                     if not impl.set(elementPtr, f, values[i]) then return false end
                 end
             end
-        elseif elementType == "String" then
+        elseif elementType == "String" and stride == DEFAULT_STRIDE then
             local oldSize = header.size or 0
             local slots
             if oldSize > 0 then
@@ -721,7 +726,12 @@ if field.elementType then
         else
             for i = 1, newSize do
                 local f = { offset = (i - 1) * stride, type = elementType }
-                f = shadowString(f, field.stringDirect)
+                if elementType == "String" then
+                    -- Inline std::string elements are always direct.
+                    f.indirect = false
+                else
+                    f = shadowString(f, field.stringDirect)
+                end
                 if impl.collectWrite then
                     if not impl.collectWrite(header.arrayPtr, f, values[i], writes) then return false end
                 else
