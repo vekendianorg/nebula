@@ -51,6 +51,70 @@ end
 local t0 = os.time()
 
 --------------------------------------------------------------------------
+-- Value preview
+--------------------------------------------------------------------------
+-- Render a fetched value compactly for the log: scalars inline,
+-- tables as {key=value, ...} with full nesting depth. Arrays are the
+-- exception — only the first few elements are shown, with the total
+-- count in the tail (event arrays can hold hundreds of structs).
+local MAX_DEPTH = 6
+local ARRAY_SHOW = 3   -- array elements shown before the "..." tail
+local MAP_SHOW = 8     -- max map keys shown per level
+
+local function preview(v, depth)
+    depth = depth or 0
+    local t = type(v)
+    if t == "string" then
+        if #v > 48 then return ("%q..."):format(v:sub(1, 45)) end
+        return ('"%s"'):format(v)
+    end
+    if t == "boolean" or t == "number" then return tostring(v) end
+    if t ~= "table" then return ("<" .. t .. ">") end
+
+    if depth >= MAX_DEPTH then return "{...}" end
+
+    -- Count entries and detect array-vs-map shape
+    local n, maxI = 0, 0
+    for _ in pairs(v) do n = n + 1 end
+    for i in pairs(v) do
+        if type(i) == "number" and i > maxI then maxI = i end
+    end
+
+    if n == 0 then return "{}" end
+
+    local isArray = maxI == n
+
+    if isArray then
+        local show = math.min(n, ARRAY_SHOW)
+        local parts = {}
+        for i = 1, show do
+            parts[#parts + 1] = preview(v[i], depth + 1)
+        end
+        if n > show then
+            parts[#parts + 1] = ("... n=%d"):format(n)
+        end
+        return "[" .. table.concat(parts, ", ") .. "]"
+    end
+
+    local parts, count = {}, 0
+    for k, e in pairs(v) do
+        count = count + 1
+        if count > MAP_SHOW then
+            parts[#parts + 1] = ("...(+%d more)"):format(n - MAP_SHOW)
+            break
+        end
+        local key
+        if type(k) == "string" and k:match("^[%a_][%w_]*$") then
+            key = k .. "="
+        else
+            key = ("[%s]="):format(tostring(k))
+        end
+        parts[#parts + 1] = key .. preview(e, depth + 1)
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+--------------------------------------------------------------------------
 -- Modules under test
 --------------------------------------------------------------------------
 local MODULES = {
@@ -112,7 +176,11 @@ local function benchModule(name, mod)
             local ms = (now() - t) * 1000
             total = total + ms
             if ok then okCount = okCount + 1 else failCount = failCount + 1 end
-            rows[i] = { id = id, ms = ms, ok = ok, err = ok and nil or tostring(v) }
+            rows[i] = {
+                id = id, ms = ms, ok = ok,
+                val = ok and v or nil,
+                err = ok and nil or tostring(v),
+            }
         end
         return rows, total, okCount, failCount
     end
@@ -120,13 +188,18 @@ local function benchModule(name, mod)
     local coldRows, coldTotal, coldOk, coldFail = pass("cold")
     local warmRows, warmTotal, warmOk, warmFail = pass("warm")
 
-    -- Per-field detail (id, cold, warm, status). Values are deliberately
-    -- not printed — some fields return large tables.
+    -- Per-field detail: id, cold/warm timing, and the fetched value
+    -- rendered compactly (scalars inline, tables as {k=v, ...} with
+    -- depth/width limits so huge arrays stay readable).
     for i, id in ipairs(ids) do
         local c, w = coldRows[i], warmRows[i]
-        local status = c.ok and "ok" or ("ERR: " .. tostring(c.err):sub(1, 60))
-        log(("    %-58s cold %9.3f ms   warm %9.3f ms   %s")
-            :format(id, c.ms, w.ms, status))
+        if c.ok then
+            log(("    %-55s cold %8.3f  warm %8.3f ms  = %s")
+                :format(id, c.ms, w.ms, preview(c.val)))
+        else
+            log(("    %-55s cold %8.3f  warm %8.3f ms  ERR: %s")
+                :format(id, c.ms, w.ms, tostring(c.err):sub(1, 60)))
+        end
     end
 
     -- Summary stats
