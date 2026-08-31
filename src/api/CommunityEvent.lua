@@ -42,6 +42,25 @@ local baseAddress = nil
 -- Base address resolution
 --==================================================
 
+local function log(...)
+    if Nebula ~= nil and Nebula.log then
+        print("[Nebula.CommunityEvent]", ...)
+    end
+end
+
+-- When no event struct is currently active, resolution fails. Cache
+-- the failure with a cooldown so repeated get() calls don't re-run
+-- the expensive full-memory scan every time; resolveBase(true) forces
+-- an immediate rescan.
+local FAIL_RETRY_SECONDS = 5
+local lastFailErr = nil
+local lastFailClock = nil
+
+local function nowSec()
+    if os.clock then return os.clock() end
+    return os.time()
+end
+
 ---@param forceRescan boolean|nil
 ---@return integer|nil address, string|nil error
 local function resolveBase(forceRescan)
@@ -49,13 +68,21 @@ local function resolveBase(forceRescan)
         return baseAddress
     end
 
+    if lastFailErr ~= nil and not forceRescan
+        and (nowSec() - lastFailClock) < FAIL_RETRY_SECONDS then
+        return nil, lastFailErr
+    end
+
     local address, err = Memory.resolveActiveCommunityEventBase()
     if not address then
-        log("resolveBase failed:", err)
-        return nil, err or "base_not_found"
+        lastFailErr = err or "base_not_found"
+        lastFailClock = nowSec()
+        log("resolveBase failed:", lastFailErr)
+        return nil, lastFailErr
     end
 
     baseAddress = address
+    lastFailErr, lastFailClock = nil, nil
     return baseAddress
 end
 
@@ -72,12 +99,6 @@ M.resolveBase = resolveBase
 ---@return boolean
 local function isLeafField(node)
     return type(node) == "table" and type(node.type) == "string"
-end
-
-local function log(...)
-    if Nebula ~= nil and Nebula.log then
-        print("[Nebula.CommunityEvent]", ...)
-    end
 end
 
 local function isOffsetKnown(field)

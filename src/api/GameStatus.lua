@@ -60,6 +60,19 @@ end
 --==================================================
 
 ---Resolve and cache the GameStatus struct base address.
+-- Cache failures with a cooldown too: if the GameStatus struct isn't
+-- present (e.g. wrong process attached), repeated get() calls would
+-- otherwise re-run the signature scan every time. resolveBase(true)
+-- forces an immediate rescan.
+local FAIL_RETRY_SECONDS = 5
+local lastFailErr = nil
+local lastFailClock = nil
+
+local function nowSec()
+    if os.clock then return os.clock() end
+    return os.time()
+end
+
 ---@param forceRescan boolean|nil
 ---@return integer|nil address, string|nil error
 local function resolveBase(forceRescan)
@@ -67,12 +80,20 @@ local function resolveBase(forceRescan)
         return baseAddress
     end
 
+    if lastFailErr ~= nil and not forceRescan
+        and (nowSec() - lastFailClock) < FAIL_RETRY_SECONDS then
+        return nil, lastFailErr
+    end
+
     local addresses, err = Memory.resolveGameStatusBase()
     if not addresses or #addresses == 0 then
-        return nil, err or "base_not_found"
+        lastFailErr = err or "base_not_found"
+        lastFailClock = nowSec()
+        return nil, lastFailErr
     end
 
     baseAddress = addresses[1]
+    lastFailErr, lastFailClock = nil, nil
     return baseAddress
 end
 

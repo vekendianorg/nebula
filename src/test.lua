@@ -80,14 +80,27 @@ local function benchModule(name, mod)
     end
     log(("  fields: %d"):format(#ids))
 
-    -- Time explicit base resolution if the module exposes it, so the
-    -- first field read isn't polluted by resolve cost.
-    local baseMs
+    -- Resolve the base once up front and time it, so the first field
+    -- read isn't polluted by resolve cost. If resolution fails (e.g.
+    -- no event struct currently active in memory), SKIP this module's
+    -- field passes entirely — otherwise every get() would trigger
+    -- another full-memory scan.
+    local baseMs, baseOk, baseErr
     if mod.resolveBase then
         local t = now()
-        local ok, err = pcall(mod.resolveBase)
+        local okB, addrOrErr = pcall(mod.resolveBase)
         baseMs = (now() - t) * 1000
-        log(("  resolveBase: %s (%.3f ms)"):format(ok and "ok" or ("FAILED: " .. tostring(err)), baseMs))
+        baseOk = okB and addrOrErr ~= nil
+        if not baseOk then
+            baseErr = okB and "base_not_found" or tostring(addrOrErr)
+        end
+        log(("  resolveBase: %s (%.3f ms)%s"):format(
+            baseOk and "ok" or ("FAILED: " .. tostring(baseErr)), baseMs,
+            baseOk and "" or "  -- skipping field passes"))
+    end
+
+    if mod.resolveBase and not baseOk then
+        return { name = name, n = #ids, skipped = true, err = baseErr }
     end
 
     local function pass(label)
@@ -157,11 +170,16 @@ log("=== OVERALL ===")
 local allCold, allWarm, allFields = 0, 0, 0
 for _, r in ipairs(results) do
     if r then
-        allCold = allCold + r.coldTotal
-        allWarm = allWarm + r.warmTotal
-        allFields = allFields + r.n
-        log(("  %-15s %3d fields  cold %9.3f ms (avg %.3f)  warm %9.3f ms (avg %.3f)")
-            :format(r.name, r.n, r.coldTotal, r.coldAvg, r.warmTotal, r.warmAvg))
+        if r.skipped then
+            log(("  %-15s SKIPPED — base not resolved (%s)")
+                :format(r.name, tostring(r.err)))
+        else
+            allCold = allCold + r.coldTotal
+            allWarm = allWarm + r.warmTotal
+            allFields = allFields + r.n
+            log(("  %-15s %3d fields  cold %9.3f ms (avg %.3f)  warm %9.3f ms (avg %.3f)")
+                :format(r.name, r.n, r.coldTotal, r.coldAvg, r.warmTotal, r.warmAvg))
+        end
     end
 end
 log(("  TOTAL: %d fields  cold %.3f ms  warm %.3f ms")
@@ -170,7 +188,7 @@ log(("  TOTAL: %d fields  cold %.3f ms  warm %.3f ms")
 -- Slowest fields across all modules (cold pass)
 local slow = {}
 for _, r in ipairs(results) do
-    if r then
+    if r and not r.skipped then
         for _, row in ipairs(r.coldRows) do
             slow[#slow + 1] = { mod = r.name, id = row.id, ms = row.ms, ok = row.ok }
         end
