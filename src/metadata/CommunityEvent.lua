@@ -6,7 +6,13 @@
 -- Cross-referenced with the shared header offsets from
 -- PublicEvent/TeamEvent (id, name, startTime, endTime,
 -- sessionEntry fields, duration, joinWindow, etc. are at the
--- same absolute offsets).
+-- same absolute offsets). Verified against the IL2CPP dump:
+-- CommunityEvent is also backed by the shared EventDefinition
+-- struct (Size 0x5D8, Confidence: exact), so the header offsets
+-- id 0x8 / name 0x20 / description 0x38 / eventIcon 0x80 /
+-- minRankToJoin 0x140 / startTimeLive 0x14C / startTime 0x150 /
+-- endTime 0x154 / sessionEntry 0x160 and the gameMode children
+-- all match exactly.
 --
 -- This is a SIMPLER struct than PublicEvent/TeamEvent:
 --   - No contentVersion field (resolution uses string search,
@@ -56,8 +62,12 @@ return {
         offset = 0x140,
         type = "Int32"
     },
-    ["startTime"] = {
+    ["startTimeLive"] = {
         offset = 0x14C,
+        type = "Int32"
+    },
+    ["startTime"] = {
+        offset = 0x150,
         type = "Int32"
     },
     ["endTime"] = {

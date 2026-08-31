@@ -3,7 +3,7 @@
 --==================================================
 -- Field table for the TeamEvent
 --
--- TeamEvent shares its header with PublicEvent — contentVersion
+-- TeamEvent shares its header with PublicEvent - contentVersion
 -- through pointsSystem are identical offsets. The header is mirrored from PublicEvent
 -- (the canonical source for that portion) rather than duplicated.
 --
@@ -17,7 +17,7 @@
 --
 -- loadModule() (see main.lua) does a fresh loadfile()+call every
 -- time, not require()-style caching, so mutating the table below is
--- safe — it won't affect PublicEvent's own separately-loaded copy.
+-- safe - it won't affect PublicEvent's own separately-loaded copy.
 --
 -- offset = 0xBAAD means the offset is NOT YET KNOWN. Do not
 -- trust these fields until the placeholder is replaced by a
@@ -27,7 +27,7 @@ local Mirror = loadModule("metadata/Mirror.lua")
 
 local metadata = Mirror.of("PublicEvent")
 
--- Fields that only exist on PublicEvent — not present in the
+-- Fields that only exist on PublicEvent - not present in the
 -- TeamEvent source, so they don't belong here.
 metadata.eventSpecials = nil
 metadata.fixedVehicles = nil
@@ -46,14 +46,16 @@ metadata.winningTeamReward = {
 }
 
 -- eventRewards (0x528) is confirmed identical in both sources and
--- stays as mirrored from PublicEvent — no patch needed.
-
--- rotatingEventRewards/rotatingEventRewardsInterval/mainEventRewards
--- are left mirrored from PublicEvent, but the TeamEvent source
--- didn't list them at all (it jumps from eventRewards straight to
--- multiRaceGameModes). That's not confirmation they're wrong for
--- TeamEvent, just that they're UNVERIFIED for it — the source may
--- simply not have documented them. Don't treat these three as
--- trusted for TeamEvent until independently confirmed.
+-- stays as mirrored from PublicEvent - no patch needed.
+--
+-- rotatingEventRewards (0x558) / rotatingEventRewardsInterval (0x570)
+-- / mainEventRewards (0x578) were previously UNVERIFIED for TeamEvent
+-- (the TeamEvent source jumped from eventRewards straight to
+-- multiRaceGameModes). The IL2CPP dump now confirms they are correct:
+-- the game stores team event definitions in
+-- Dictionary<string, Pointer<EventDefinition>>, i.e. the SAME
+-- EventDefinition struct backs PublicEvent, TeamEvent and
+-- CommunityEvent (Size 0x5D8, Confidence: exact). All mirrored
+-- offsets in the 0x528..0x590 range are therefore verified.
 
 return metadata

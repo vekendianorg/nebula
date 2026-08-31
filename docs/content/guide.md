@@ -524,3 +524,8 @@ required at runtime.
       `metadata/PublicEvent.lua` — 4 of 5 resolved against the dump;
       `maxBotCount` remains as documented placeholder (not present in
       `GameModeDefinition` struct in the current binary)
+- [x] Verify `metadata/TeamEvent.lua` and `metadata/CommunityEvent.lua`
+      against the dump — both confirmed backed by the shared
+      `EventDefinition` struct; `startTime` corrected from `0x14C` to
+      `0x150` (`0x14C` is `startTimeLive`), TeamEvent's mirrored
+      rotating-rewards offsets confirmed

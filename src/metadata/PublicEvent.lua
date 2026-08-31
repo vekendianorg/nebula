@@ -292,8 +292,12 @@ return {
         offset = 0x144,
         type = "Int32"
     },
-    ["startTime"] = {
+    ["startTimeLive"] = {
         offset = 0x14C,
+        type = "Int32"
+    },
+    ["startTime"] = {
+        offset = 0x150,
         type = "Int32"
     },
     ["endTime"] = {

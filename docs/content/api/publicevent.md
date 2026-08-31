@@ -86,8 +86,15 @@ print(meta.name, meta.type, meta.offset, meta.known)
 
 > **Offset verification status**: All PublicEvent field offsets have been
 > cross-referenced against the IL2CPP struct dump (`libcocos2dcpp.cs`).
-> Four previously-unknown offsets (`gameMode.gameMode`, `levelPool.poolOrder`,
-> `levelPool.levelOrder`, `pointsSystem.type`) are now resolved. The field
+> The dump shows the game stores event definitions in
+> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
+> PublicEvent, TeamEvent and CommunityEvent. Four previously-unknown
+> offsets (`gameMode.gameMode`, `levelPool.poolOrder`,
+> `levelPool.levelOrder`, `pointsSystem.type`) are now resolved, and
+> `startTime` was corrected from `0x14C` to `0x150` (the dump has
+> `startTimeLive` at `0x14C` and `startTime` at `0x150`; a new
+> `startTimeLive` field exposes the former). The field
 > `gameMode.maxBotCount` remains at `0xBAAD` — it was not found in the
 > current `GameModeDefinition` struct in the dump and may have been removed
 > or renamed. Fields with `known = false` (still at `0xBAAD`) are excluded

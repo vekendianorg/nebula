@@ -77,3 +77,16 @@ value.
 local meta = Nebula.TeamEvent.meta("minTeamSizeToJoin")
 print(meta.name, meta.type, meta.offset, meta.known)
 ```
+
+> **Offset verification status**: TeamEvent's header is mirrored from
+> `metadata/PublicEvent.lua`, which has been fully cross-referenced
+> against the IL2CPP struct dump (`libcocos2dcpp.cs`). The dump shows
+> team event definitions are stored in
+> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
+> PublicEvent, TeamEvent and CommunityEvent. TeamEvent's unique tail
+> fields are confirmed: `multiRaceGameModes` at `0x500` and
+> `winningTeamReward` at `0x520`. The previously-unverified mirrored
+> fields (`eventRewards` 0x528, `rotatingEventRewards` 0x558,
+> `rotatingEventRewardsInterval` 0x570, `mainEventRewards` 0x578) are
+> all confirmed by the dump.
