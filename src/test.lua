@@ -38,20 +38,152 @@ local function log(msg)
     print(msg)
 end
 
+--------------------------------------------------------------------------
+-- Timing helper
+--------------------------------------------------------------------------
+-- os.clock() returns CPU seconds (fractional); os.time() is whole seconds.
+-- Prefer os.clock for per-field resolution, fall back if unavailable.
+local function now()
+    if os.clock then return os.clock() end
+    return os.time()
+end
+
 local t0 = os.time()
 
-local r, err = Nebula.GameStatus.get("vehicleStatus[1].tuningPartPresets")
-print(r)
-
-r[#r+1] = {
-    ['equippedParts'] = {
-        [1] = 'jeep_nitro',
-        [2] = 'jeep_jump'
-    },
+--------------------------------------------------------------------------
+-- Modules under test
+--------------------------------------------------------------------------
+local MODULES = {
+    { name = "GameStatus",    mod = Nebula.GameStatus },
+    { name = "PublicEvent",   mod = Nebula.PublicEvent },
+    { name = "TeamEvent",     mod = Nebula.TeamEvent },
+    { name = "CommunityEvent", mod = Nebula.CommunityEvent },
 }
 
-local w, err = Nebula.GameStatus.set("vehicleStatus[1].tuningPartPresets", r)
-print(w)
+--------------------------------------------------------------------------
+-- Per-module benchmark: enumerate every field, time each get()
+--
+-- Two passes per module:
+--   COLD  - first read of each field (includes any pointer chasing,
+--           gg memory reads, string decoding)
+--   WARM  - second read (base addresses / repeated fields are cached
+--           by core/Cache.lua, so this isolates raw read cost)
+--------------------------------------------------------------------------
+local function benchModule(name, mod)
+    log("")
+    log(("=== %s ==="):format(name))
 
-local r2, err = Nebula.GameStatus.get("vehicleStatus[1].tuningPartPresets")
-print(r2)
+    local ids = mod.fields()
+    if not ids or #ids == 0 then
+        log("  (no fields returned by fields())")
+        return nil
+    end
+    log(("  fields: %d"):format(#ids))
+
+    -- Time explicit base resolution if the module exposes it, so the
+    -- first field read isn't polluted by resolve cost.
+    local baseMs
+    if mod.resolveBase then
+        local t = now()
+        local ok, err = pcall(mod.resolveBase)
+        baseMs = (now() - t) * 1000
+        log(("  resolveBase: %s (%.3f ms)"):format(ok and "ok" or ("FAILED: " .. tostring(err)), baseMs))
+    end
+
+    local function pass(label)
+        local rows = {}
+        local total, okCount, failCount = 0, 0, 0
+        for i, id in ipairs(ids) do
+            local t = now()
+            local ok, v = pcall(mod.get, id)
+            local ms = (now() - t) * 1000
+            total = total + ms
+            if ok then okCount = okCount + 1 else failCount = failCount + 1 end
+            rows[i] = { id = id, ms = ms, ok = ok, err = ok and nil or tostring(v) }
+        end
+        return rows, total, okCount, failCount
+    end
+
+    local coldRows, coldTotal, coldOk, coldFail = pass("cold")
+    local warmRows, warmTotal, warmOk, warmFail = pass("warm")
+
+    -- Per-field detail (id, cold, warm, status). Values are deliberately
+    -- not printed — some fields return large tables.
+    for i, id in ipairs(ids) do
+        local c, w = coldRows[i], warmRows[i]
+        local status = c.ok and "ok" or ("ERR: " .. tostring(c.err):sub(1, 60))
+        log(("    %-58s cold %9.3f ms   warm %9.3f ms   %s")
+            :format(id, c.ms, w.ms, status))
+    end
+
+    -- Summary stats
+    local coldMin, coldMax, coldMaxId = math.huge, 0, "-"
+    for _, r in ipairs(coldRows) do
+        if r.ms < coldMin then coldMin = r.ms end
+        if r.ms > coldMax then coldMax, coldMaxId = r.ms, r.id end
+    end
+
+    log(("  COLD: total %.3f ms  avg %.3f ms  min %.3f ms  max %.3f ms (%s)  ok %d  fail %d")
+        :format(coldTotal, coldTotal / #ids, coldMin, coldMax, coldMaxId, coldOk, coldFail))
+    log(("  WARM: total %.3f ms  avg %.3f ms  (base + repeated fields cached)")
+        :format(warmTotal, warmTotal / #ids))
+    if coldTotal > 0 then
+        log(("  cache effect: %.1fx faster on warm reads")
+            :format(coldTotal / math.max(warmTotal, 1e-9)))
+    end
+
+    return {
+        name = name, n = #ids, baseMs = baseMs,
+        coldTotal = coldTotal, coldAvg = coldTotal / #ids,
+        coldMax = coldMax, coldMaxId = coldMaxId,
+        warmTotal = warmTotal, warmAvg = warmTotal / #ids,
+        coldRows = coldRows,
+    }
+end
+
+--------------------------------------------------------------------------
+-- Run all modules
+--------------------------------------------------------------------------
+local results = {}
+for _, m in ipairs(MODULES) do
+    results[#results + 1] = benchModule(m.name, m.mod)
+end
+
+--------------------------------------------------------------------------
+-- Overall report
+--------------------------------------------------------------------------
+log("")
+log("=== OVERALL ===")
+local allCold, allWarm, allFields = 0, 0, 0
+for _, r in ipairs(results) do
+    if r then
+        allCold = allCold + r.coldTotal
+        allWarm = allWarm + r.warmTotal
+        allFields = allFields + r.n
+        log(("  %-15s %3d fields  cold %9.3f ms (avg %.3f)  warm %9.3f ms (avg %.3f)")
+            :format(r.name, r.n, r.coldTotal, r.coldAvg, r.warmTotal, r.warmAvg))
+    end
+end
+log(("  TOTAL: %d fields  cold %.3f ms  warm %.3f ms")
+    :format(allFields, allCold, allWarm))
+
+-- Slowest fields across all modules (cold pass)
+local slow = {}
+for _, r in ipairs(results) do
+    if r then
+        for _, row in ipairs(r.coldRows) do
+            slow[#slow + 1] = { mod = r.name, id = row.id, ms = row.ms, ok = row.ok }
+        end
+    end
+end
+table.sort(slow, function(a, b) return a.ms > b.ms end)
+log("")
+log("=== SLOWEST 15 FIELDS (cold pass) ===")
+for i = 1, math.min(15, #slow) do
+    local s = slow[i]
+    log(("  %-15s %-55s %9.3f ms%s"):format(
+        s.mod, s.id, s.ms, s.ok and "" or "  (error)"))
+end
+
+log("")
+log(("done in %d s wall time"):format(os.time() - t0))
