@@ -351,6 +351,9 @@ return {
             -- NOT FOUND in GameModeDefinition dump. Field does not exist
             -- between maxSessionParticipants (0x138) and initialFuelTank (0x13c).
             -- May have been removed or renamed. Do not trust.
+            -- NOT FOUND in GameModeDefinition dump. Field does not exist
+            -- between maxSessionParticipants (0x138) and initialFuelTank (0x13c).
+            -- May have been removed or renamed. Do not trust.
             offset = 0xBAAD,
             type = "Int32"
         },

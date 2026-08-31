@@ -83,3 +83,12 @@ value.
 local meta = Nebula.PublicEvent.meta("minTeamSizeToJoin")
 print(meta.name, meta.type, meta.offset, meta.known)
 ```
+
+> **Offset verification status**: All PublicEvent field offsets have been
+> cross-referenced against the IL2CPP struct dump (`libcocos2dcpp.cs`).
+> Four previously-unknown offsets (`gameMode.gameMode`, `levelPool.poolOrder`,
+> `levelPool.levelOrder`, `pointsSystem.type`) are now resolved. The field
+> `gameMode.maxBotCount` remains at `0xBAAD` — it was not found in the
+> current `GameModeDefinition` struct in the dump and may have been removed
+> or renamed. Fields with `known = false` (still at `0xBAAD`) are excluded
+> from `fields()` output.
