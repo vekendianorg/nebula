@@ -26,6 +26,7 @@ Nebula = Nebula or {}
 Nebula.log = true
 Nebula.verbose = false
 Nebula.GameStatus = loadModule("api/GameStatus.lua")
+Nebula.defineApi = loadModule("core/defineApi.lua").create
 Nebula.PublicEvent = loadModule("api/PublicEvent.lua")
 Nebula.TeamEvent  = loadModule("api/TeamEvent.lua")
 Nebula.CommunityEvent = loadModule("api/CommunityEvent.lua")

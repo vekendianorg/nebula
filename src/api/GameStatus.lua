@@ -19,7 +19,15 @@ local Type     = loadModule("core/Type.lua")
 local Repeated = loadModule("core/Repeated.lua")
 local Path     = loadModule("core/Path.lua")
 local Struct   = loadModule("core/Struct.lua")
-local metadata = loadModule("metadata/GameStatus.lua")
+local Manifest = loadModule("metadata/manifest.lua")
+
+-- GameStatus metadata is versioned like every other struct —
+-- resolved from the running game's version via the manifest
+-- (metadata/<version>/structs/GameStatus.lua complete snapshots).
+-- When no game version is available (dev/test runs outside GG),
+-- Manifest.load() falls back to the newest registered snapshot so
+-- the module still loads.
+local metadata, metadataVersion = Manifest.load("GameStatus")
 
 local M = {}
 
@@ -50,7 +58,7 @@ local function resolveEnum(enumName)
     if enumCache[enumName] ~= nil then
         return enumCache[enumName]
     end
-    local enum = loadModule("metadata/enums/" .. enumName .. ".lua")
+    local enum = Manifest.loadEnum(enumName)
     enumCache[enumName] = enum
     return enum
 end

@@ -1,0 +1,56 @@
+---@class cocos2d_Texture2D_PixelFormat
+-- Source (IL2CPP dump): cocos2d::Texture2D
+-- Auto-generated from a bulk enum dump (enums.cs). Not
+-- individually curated/cross-referenced like ChestType/TuningRarity/
+-- UnlockType/GameStatusFlag — verify a given ID against on-device
+-- behavior before relying on it for anything write-side.
+return {
+    byId = {
+        [0] = "AUTO",
+        [1] = "BGRA8888",
+        [2] = "RGBA8888",
+        [3] = "RGB888",
+        [4] = "RGB565",
+        [5] = "A8",
+        [6] = "I8",
+        [7] = "AI88",
+        [8] = "RGBA4444",
+        [9] = "RGB5A1",
+        [10] = "PVRTC4",
+        [11] = "PVRTC4A",
+        [12] = "PVRTC2",
+        [13] = "PVRTC2A",
+        [14] = "ETC",
+        [15] = "S3TC_DXT1",
+        [16] = "S3TC_DXT3",
+        [17] = "S3TC_DXT5",
+        [18] = "ATC_RGB",
+        [19] = "ATC_EXPLICIT_ALPHA",
+        [20] = "ATC_INTERPOLATED_ALPHA",
+        [-1] = "NONE",
+    },
+    byName = {
+        AUTO = 0,
+        BGRA8888 = 1,
+        RGBA8888 = 2,
+        RGB888 = 3,
+        RGB565 = 4,
+        A8 = 5,
+        I8 = 6,
+        AI88 = 7,
+        RGBA4444 = 8,
+        RGB5A1 = 9,
+        PVRTC4 = 10,
+        PVRTC4A = 11,
+        PVRTC2 = 12,
+        PVRTC2A = 13,
+        ETC = 14,
+        S3TC_DXT1 = 15,
+        S3TC_DXT3 = 16,
+        S3TC_DXT5 = 17,
+        ATC_RGB = 18,
+        ATC_EXPLICIT_ALPHA = 19,
+        ATC_INTERPOLATED_ALPHA = 20,
+        NONE = -1,
+    },
+}

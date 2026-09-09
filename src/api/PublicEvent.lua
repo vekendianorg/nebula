@@ -3,12 +3,17 @@
 --==================================================
 -- Public-facing Nebula.PublicEvent module.
 --
--- The field schema and offsets are defined by metadata/PublicEvent.lua
--- (the canonical source — see that file for what TeamEvent mirrors
--- from it, and for the offset conventions this module relies on).
--- Base resolution here picks out whichever PublicEvent struct is
--- currently active. See core/Memory.lua for the
--- byte-signature scan.
+-- Bound to the shared EventDefinition struct (see
+-- metadata/1.73/structs/EventDefinition.lua, the single authoritative field
+-- layout) through Nebula.defineApi() — see core/defineApi.lua for
+-- the generic get/set/fields/meta implementation and automatic
+-- metadata version resolution. Every EventDefinition field is
+-- reachable here, not just the ones PublicEvent's own gameplay
+-- currently uses.
+--
+-- Base resolution is unchanged: whichever PublicEvent struct is
+-- currently active, found via the existing byte-signature scan —
+-- see core/Memory.lua's resolveActivePublicEventBase().
 --
 --   Nebula.PublicEvent.get("startTime")
 --   Nebula.PublicEvent.get("gameMode.duration")
@@ -24,20 +29,11 @@
 --   })
 --   Nebula.PublicEvent.set("startTime", 1700000000)
 --   Nebula.PublicEvent.set("startTime", 1700000000):dry()
---
--- get() with no id resolves the currently-active struct's base
--- address immediately and returns an object bound to that exact
--- snapshot — so a sequence of event.get(...) calls stays consistent
--- even if a different event becomes "current" in between. No
--- separate :now() step is needed.
 
-local Memory   = loadModule("core/Memory.lua")
-local Type     = loadModule("core/Type.lua")
-local Repeated = loadModule("core/Repeated.lua")
-local Path     = loadModule("core/Path.lua")
-local Struct   = loadModule("core/Struct.lua")
-local metadata = loadModule("metadata/PublicEvent.lua")
+local Memory    = loadModule("core/Memory.lua")
+local defineApi = loadModule("core/defineApi.lua")
 
+<<<<<<< HEAD
 local M = {}
 
 M.metadata = metadata
@@ -436,73 +432,9 @@ setmetatable(SetOperation, {
         self._ok, self._err = ok, err
         return self
     end
+=======
+return defineApi.create({
+    struct  = "EventDefinition",
+    resolve = Memory.resolveActivePublicEventBase,
+>>>>>>> main
 })
-
----Write a field value to the currently-active PublicEvent struct.
----For array-of-struct fields (eventRewards), pass a Lua array of
----element tables — only keys present in each element are written
----(partial update). Scalar fields accept plain numbers/strings.
----@param id string @ dotted field id
----@param value any
----@return table operation @ chainable; already executed
-function M.set(id, value)
-    return SetOperation(id, value)
-end
-
---==================================================
--- fields() / meta() — read-only introspection
---==================================================
-
----@param node table
----@param prefix string|nil
----@param results string[]
-local function walkFields(node, prefix, results)
-    for key, child in pairs(node) do
-        if type(child) == "table" then
-            local id = prefix and (prefix .. "." .. key) or key
-            if isLeafField(child) then
-                if isOffsetKnown(child) then
-                    results[#results + 1] = id
-                end
-            else
-                walkFields(child, id, results)
-            end
-        end
-    end
-end
-
----List every offset-verified field's dotted id. Fields still at the
----0xBAAD placeholder, and per-element Array templates, are excluded.
----@return string[] ids
-function M.fields()
-    local results = {}
-    walkFields(metadata, nil, results)
-    table.sort(results)
-    return results
-end
-
----@param id string
----@return table|nil metaView, string|nil error
-function M.meta(id)
-    local result, err = resolvePath(id)
-    local field = result and result.field
-    if not field then
-        return nil, err
-    end
-
-    local view = {
-        name     = id,
-        type     = field.type,
-        offset   = field.offset,
-        repeated = field.repeated,
-        known    = isOffsetKnown(field),
-    }
-
-    if baseAddress ~= nil and view.known then
-        view.address = baseAddress + field.offset
-    end
-
-    return view
-end
-
-return M

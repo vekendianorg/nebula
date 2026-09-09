@@ -3,13 +3,16 @@
 --==================================================
 -- Public-facing Nebula.TeamEvent module.
 --
--- TeamEvent mirrors PublicEvent through metadata/TeamEvent.lua (see
--- that file for what's shared vs. patched). Base resolution here is
--- TeamEvent-specific, though: unlike GameStatus's single fixed
--- struct, there can be several TeamEvent structs in memory at once
--- (past/current/upcoming), so resolveBase() picks out whichever one
--- is currently active. See core/Memory.lua for the
--- byte-signature scan.
+-- Bound to the shared EventDefinition struct (see
+-- metadata/1.73/structs/EventDefinition.lua) through Nebula.defineApi() —
+-- same struct, same metadata, same field set as Nebula.PublicEvent
+-- and Nebula.CommunityEvent. See core/defineApi.lua.
+--
+-- Base resolution is unchanged and TeamEvent-specific: unlike
+-- GameStatus's single fixed struct, several TeamEvent structs can
+-- exist in memory at once (past/current/upcoming), so
+-- resolveActiveTeamEventBase() picks out whichever one is currently
+-- active. See core/Memory.lua for the byte-signature scan.
 --
 --   Nebula.TeamEvent.get("startTime")
 --   Nebula.TeamEvent.get("sessionEntry.entryFeeTickets")
@@ -25,13 +28,10 @@
 --   })
 --   Nebula.TeamEvent.set("startTime", 1700000000):dry()
 
-local Memory   = loadModule("core/Memory.lua")
-local Type     = loadModule("core/Type.lua")
-local Repeated = loadModule("core/Repeated.lua")
-local Path     = loadModule("core/Path.lua")
-local Struct   = loadModule("core/Struct.lua")
-local metadata = loadModule("metadata/TeamEvent.lua")
+local Memory    = loadModule("core/Memory.lua")
+local defineApi = loadModule("core/defineApi.lua")
 
+<<<<<<< HEAD
 local M = {}
 
 M.metadata = metadata
@@ -413,70 +413,9 @@ setmetatable(SetOperation, {
         self._ok, self._err = ok, err
         return self
     end
+=======
+return defineApi.create({
+    struct  = "EventDefinition",
+    resolve = Memory.resolveActiveTeamEventBase,
+>>>>>>> main
 })
-
----Write a field value to the currently-active TeamEvent struct.
----Same interface as PublicEvent.set — see api/PublicEvent.lua.
----@param id string @ dotted field id
----@param value any
----@return table operation @ chainable; already executed
-function M.set(id, value)
-    return SetOperation(id, value)
-end
-
---==================================================
--- fields() / meta() — read-only introspection
---==================================================
-
----@param node table
----@param prefix string|nil
----@param results string[]
-local function walkFields(node, prefix, results)
-    for key, child in pairs(node) do
-        if type(child) == "table" then
-            local id = prefix and (prefix .. "." .. key) or key
-            if isLeafField(child) then
-                if isOffsetKnown(child) then
-                    results[#results + 1] = id
-                end
-            else
-                walkFields(child, id, results)
-            end
-        end
-    end
-end
-
----List every offset-verified field's dotted id.
----@return string[] ids
-function M.fields()
-    local results = {}
-    walkFields(metadata, nil, results)
-    table.sort(results)
-    return results
-end
-
----@param id string
----@return table|nil metaView, string|nil error
-function M.meta(id)
-    local result, err = resolvePath(id)
-    local field = result and result.field
-    if not field then
-        return nil, err
-    end
-
-    local view = {
-        name     = id,
-        type     = field.type,
-        offset   = field.offset,
-        repeated = field.repeated,
-        known    = isOffsetKnown(field),
-    }
-
-    if baseAddress ~= nil and view.known then
-        view.address = baseAddress + field.offset
-    end
-
-    return view
-end
-
-return M

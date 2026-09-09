@@ -9,12 +9,14 @@ end
 
 BitMask.__index = BitMask
 
+local Manifest = loadModule("metadata/manifest.lua")
+
 local function loadEnum(field)
     if type(field.enum) == "table" then
         return field.enum
     end
 
-    return loadModule("metadata/enums/" .. field.enum .. ".lua")
+    return Manifest.loadEnum(field.enum)
 end
 
 function BitMask.new(value, enum)
