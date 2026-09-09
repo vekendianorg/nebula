@@ -53,14 +53,21 @@ Nebula.verbose = false
 
 Nebula.GameStatus = loadModule("api/GameStatus.lua")
 
--- PublicEvent owns the canonical event metadata. TeamEvent mirrors that
--- metadata through metadata/TeamEvent.lua and keeps a separate get().
-Nebula.PublicEvent = loadModule("api/PublicEvent.lua")
-Nebula.TeamEvent  = loadModule("api/TeamEvent.lua")
+-- Generic API-to-struct bridge. See core/defineApi.lua and
+-- metadata/manifest.lua. PublicEvent/TeamEvent/CommunityEvent below
+-- are all thin defineApi() configs bound to the single shared
+-- EventDefinition struct (metadata/1.73/structs/EventDefinition.lua) — no
+-- per-event field definitions, no field filtering.
+Nebula.defineApi = loadModule("core/defineApi.lua").create
 
--- CommunityEvent (CommunityShowcase) is a separate event type with
--- its own simpler struct and string-search resolution.
-Nebula.CommunityEvent = loadModule("api/CommunityEvent.lua")
+-- PublicEvent, TeamEvent, and CommunityEvent (CommunityShowcase) are
+-- three different in-game event types, each with its own base
+-- address resolver (AOB scan or string search — see
+-- core/Memory.lua), but all three share the same physical
+-- EventDefinition struct and therefore the same metadata.
+Nebula.PublicEvent     = loadModule("api/PublicEvent.lua")
+Nebula.TeamEvent       = loadModule("api/TeamEvent.lua")
+Nebula.CommunityEvent  = loadModule("api/CommunityEvent.lua")
 
 -- Expose the type registry and Memory layer for advanced/extension
 -- use (e.g. a consumer registering a custom type via

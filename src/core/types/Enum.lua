@@ -5,7 +5,8 @@
 -- Int32 from memory and converts to the schema string name; writes
 -- a string name back as the Int32 enum value.
 --
--- The enum table is loaded from metadata/enums/<field.enum>.lua
+-- The enum table is loaded from
+-- metadata/<version>/enums/<field.enum>.lua via metadata/manifest.lua
 -- (or used inline if field.enum is a table). It must expose:
 --   byId[number]   → string name
 --   byName[string] → number id
@@ -18,6 +19,7 @@
 -- set accepts either the string name or the raw number.
 
 local Memory = loadModule("core/Memory.lua")
+local Manifest = loadModule("metadata/manifest.lua")
 
 local M = {}
 
@@ -36,7 +38,7 @@ local function loadEnum(field)
     if not field.enum then
         return { byId = {}, byName = {} }
     end
-    return loadModule("metadata/enums/" .. field.enum .. ".lua")
+    return Manifest.loadEnum(field.enum)
 end
 
 ---@param baseAddress integer

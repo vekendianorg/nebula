@@ -100,4 +100,18 @@ local meta = Nebula.CommunityEvent.meta("minRankToJoin")
 print(meta.type, meta.offset, meta.known)
 ```
 
+> **Offset verification status**: CommunityEvent's offsets have been
+> cross-referenced against the IL2CPP struct dump (`libcocos2dcpp.cs`).
+> The dump shows the game stores event definitions in
+> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
+> PublicEvent, TeamEvent and CommunityEvent. All header offsets in
+> `metadata/CommunityEvent.lua` match exactly (`id` 0x8, `name` 0x20,
+> `description` 0x38, `eventIcon` 0x80, `minRankToJoin` 0x140,
+> `startTimeLive` 0x14C, `startTime` 0x150, `endTime` 0x154,
+> `sessionEntry` 0x160), as do the `gameMode` children (`duration` 0x21C,
+> `joinWindow` 0x220, `maxSessionParticipants` 0x2D0, `levelPools` 0x2F0).
+> `startTime` was corrected from `0x14C` to `0x150` during verification;
+> `0x14C` is `startTimeLive` in the dump, now exposed as its own field.
+
 </parameter>

@@ -114,21 +114,42 @@ Nebula
 │       └── Achievement.lua       -- example named message type
 │
 └── metadata/
-    ├── GameStatus.lua            -- field table: offsets, types, per field
-    ├── PublicEvent.lua           -- canonical PublicEvent field schema/offsets
-    ├── TeamEvent.lua             -- mirrors PublicEvent's header, patches its own tail
-    ├── CommunityEvent.lua        -- standalone schema; string-search resolution
-    ├── Mirror.lua                -- helper for metadata mirrors
-    └── enums/
-        ├── GameStatusFlag.lua    -- bit name -> value map for the `flags` field
-        └── ChestType.lua       -- chest ID ↔ name enum (common, rare, epic, ...)
+    ├── manifest.lua             -- version resolver: resolves the running
+    │                            -- game's version (e.g. 1.74.2 -> "1.74") to
+    │                            -- a metadata folder, then loads structs and
+    │                            -- enums from it. Exposes M.load(struct),
+    │                            -- M.loadEnum(enum), and the raw
+    │                            -- M.resolve / M.resolveEnum helpers.
+    └── <version>/               -- one folder PER GAME VERSION, each a
+        │                        -- COMPLETE snapshot: copy the folder and
+        │                        -- edit only the structs that changed.
+        ├── structs/             -- 93 struct metadata files, e.g.:
+        │   ├── GameStatus.lua   -- complete GameStatus snapshot (game 1.73)
+        │   ├── EventDefinition.lua -- backs PublicEvent, TeamEvent,
+        │   │                      -- CommunityEvent (defineApi)
+        │   ├── VehicleStatus.lua  -- + VehicleStats, TuningPartStatus,
+        │   │                      --   MasteryStatus, DistanceHighscore, ...
+        │   ├── LootDefinition.lua -- + CustomizationLoot, UpgradeLoot,
+        │   │                      --   StyleShardReward, ...
+        │   ├── CollectibleDefinition.lua -- inherits ObjectDefinition,
+        │   │                      --   + AttachmentDefinition
+        │   └── ...(one file per dump struct)...
+        └── enums/               -- 752 enum value tables, e.g.:
+            ├── ChestType.lua    -- chest ID <-> name (common, rare, epic, ...)
+            ├── GameStatusFlag.lua -- bit name -> value map for `flags`
+            ├── TuningRarity.lua -- tuning part rarity levels
+            └── ...(one file per dump enum)...
 ```
 
 ## How it fits together
 
-1. **`metadata/GameStatus.lua`** declares every known field on the
-   `GameStatus` struct: its byte offset, whether it's a repeated
-   field, and which type it is.
+1. **`metadata/<version>/structs/GameStatus.lua`** declares every known
+   field on the `GameStatus` struct: its byte offset, whether it's a
+   repeated field, and which type it is. The right version folder is
+   picked automatically from the running game's version by
+   **`metadata/manifest.lua`** — e.g. a game running `1.74.2`
+   resolves the `1.74` folder. A new snapshot file is only added when
+   the struct's layout actually changes.
 2. **`core/Type.lua`** is a registry mapping a type name (`"Int32"`,
    `"String"`, `"Achievement"`, ...) to the module implementing
    `get(base, field)` / `set(base, field, value)` for it.
@@ -156,21 +177,31 @@ Adding a new field is a metadata edit. Adding a new scalar or message
 type is a new file in `core/types/`. Neither requires touching the
 public API.
 
-### Mirrored metadata
+### Versioned metadata
 
-Some game structures share an identical schema and offsets but have
-different API retrieval paths. In that case, keep one canonical
-metadata file and make the other metadata file a mirror.
+Struct metadata is versioned by game version, not hand-picked per
+API call. `metadata/manifest.lua` resolves the running game's
+two-component version (e.g. `1.74`, from a game running `1.74.2`)
+to the closest version folder at or below it; if the game is older
+than every known folder, the oldest one is used rather than failing.
+Each version folder is a COMPLETE snapshot — there are no runtime
+diff/merge chains. To cut a new version, copy the whole folder and
+edit only the structs/enums that actually changed.
 
-`metadata/PublicEvent.lua` is the canonical event schema.
-`metadata/TeamEvent.lua` mirrors it through `metadata/Mirror.lua`, so
-TeamEvent does not duplicate the offsets and does not need to inherit
-from `api/PublicEvent.lua`. If the shared schema changes, update the
-canonical metadata once and both event types receive the same fields.
+Two loaders, one shared version step (`resolveCurrentVersion`):
+- `M.load("GameStatus")` → `metadata/<version>/structs/GameStatus.lua`
+- `M.loadEnum("ChestType")` → `metadata/<version>/enums/ChestType.lua`
 
-The API layer remains separate: `Nebula.PublicEvent.get()` and
-`Nebula.TeamEvent.get()` can have different retrieval implementations
-while consuming the same metadata schema.
+Structures shared by several APIs keep a single snapshot:
+`metadata/1.73/structs/EventDefinition.lua` is the one physical struct
+behind `Nebula.PublicEvent`, `Nebula.TeamEvent` and
+`Nebula.CommunityEvent`, bound via
+`Nebula.defineApi({ struct = "EventDefinition", resolve = ... })`.
+If the shared schema changes, update the snapshot once and all
+three event APIs see the new fields. The API layer remains
+separate: each event type has its own base-address resolver
+(AOB scan or string search) while consuming the same metadata
+schema.
 
 ### Per-element templates (`elements`)
 
@@ -511,10 +542,33 @@ required at runtime.
 
 ## Roadmap
 
-- [ ] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
-      `metadata/GameStatus.lua`
+- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
+      `metadata/1.73/structs/GameStatus.lua` — complete, all offsets verified against
+      the IL2CPP struct dump
 - [ ] Additional message types beyond `Achievement`
       (`DriverCustomization`, `RewardManagerStatus`, `VipStatus`, ...)
 - [ ] Additional modules beyond `GameStatus`: `Vehicle`, `Garage`, ...
-- [ ] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
-      event metadata files
+- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
+      `metadata/1.73/structs/EventDefinition.lua` — all offsets resolved
+      against the dump; `maxBotCount` remains as documented
+      placeholder (not present in `GameModeDefinition` struct in
+      the current binary); `startTime` corrected from `0x14C` to
+      `0x150` (`0x14C` is `startTimeLive`), TeamEvent's mirrored
+      rotating-rewards offsets confirmed
+- [x] Extract every inline element template into its own per-class
+      versioned snapshot under `metadata/1.73/structs/<Class>.lua`
+      (93 structs total, registered in the manifest VERSIONS and
+      chained through `Manifest.load()`), each cross-verified against
+      the dump. Newly resolved: `eventSpecials` elements
+      (ConditionalRewardDefinition), VehicleChest's
+      `chestIndex@0x18`, SpecialFeatureDefinition's
+      `vehicleId@0x18`. Flagged for on-device re-verification:
+      CustomChest (dump Size 0x150 vs legacy 0x50-stride layout,
+      `customChests` moved 0x1B0→0x138 per dump), and the dump vs
+      legacy field-order swap in UnlockablePaint /
+      UnlockableSpriteVariant.
+- [x] Verify `metadata/1.73/structs/GameStatus.lua` against the dump — all
+      nested element templates match their dump classes exactly;
+      newly mapped: ActiveBooster (EventStatus.activeBoosters ×4),
+      LevelCollectibleStatus (DistanceCollectibleStatus.levels),
+      VehicleStatus.specialFeatureUpgrades@0x150.

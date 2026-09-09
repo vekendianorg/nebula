@@ -514,10 +514,18 @@ required at runtime.
 
 ## Roadmap
 
-- [ ] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
-      `metadata/GameStatus.lua`
+- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
+      `metadata/GameStatus.lua` — complete, all offsets verified against
+      the IL2CPP struct dump
 - [ ] Additional message types beyond `Achievement`
       (`DriverCustomization`, `RewardManagerStatus`, `VipStatus`, ...)
 - [ ] Additional modules beyond `GameStatus`: `Vehicle`, `Garage`, ...
-- [ ] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
-      event metadata files
+- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) in
+      `metadata/PublicEvent.lua` — 4 of 5 resolved against the dump;
+      `maxBotCount` remains as documented placeholder (not present in
+      `GameModeDefinition` struct in the current binary)
+- [x] Verify `metadata/TeamEvent.lua` and `metadata/CommunityEvent.lua`
+      against the dump — both confirmed backed by the shared
+      `EventDefinition` struct; `startTime` corrected from `0x14C` to
+      `0x150` (`0x14C` is `startTimeLive`), TeamEvent's mirrored
+      rotating-rewards offsets confirmed
