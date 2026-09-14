@@ -1,3 +1,7 @@
+--==================================================
+-- core/types/SafeInt32.lua
+--==================================================
+
 local Memory = loadModule("core/Memory.lua")
 local ZeroPage = loadModule("core/ZeroPage.lua")
 
@@ -106,9 +110,11 @@ end
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.SafeInt32]", ...)
+    if Nebula and Nebula.log then
+        Logfile.log("[SafeInt32]", ...)
     end
 end
 
@@ -129,12 +135,20 @@ local function resolveStaticKey(baseAddress)
         return cachedStaticKey
     end
     if cachedGameStatusBase == nil then
-        if Nebula and Nebula.GameStatus and Nebula.GameStatus.resolveBase then
-            cachedGameStatusBase = Nebula.GameStatus.resolveBase()
+        -- GameStatus is PlayerInfo's child (mGameStatus @0x148,
+        -- metadata/<version>/structs/PlayerInfo.lua): when no base
+        -- was passed in, descend from the PlayerInfo base
+        -- (api/PlayerInfo.lua owns the signature scan + cache).
+        if Nebula and Nebula.PlayerInfo and Nebula.PlayerInfo.resolveBase then
+            local piBase = Nebula.PlayerInfo.resolveBase()
+            if piBase then
+                cachedGameStatusBase = Memory.deref(piBase, 0x148)
+            end
         end
     end
     local gsBase = cachedGameStatusBase or baseAddress
     cachedStaticKey = Memory.read(gsBase + STATIC_KEY_OFFSET, Memory.FLAGS.INT32) or 0
+    log(string.format("staticKey resolved: gsBase=0x%X key=%d", gsBase, cachedStaticKey))
     return cachedStaticKey
 end
 
@@ -166,10 +180,15 @@ function M.get(baseAddress, field)
     local staticKey = resolveStaticKey(baseAddress)
 
     if not instance:isValid(staticKey) then
+        log(string.format("[get] REJECTED at structPtr=0x%X (base=0x%X offset=0x%X): checksum_invalid (safeValue=%d key=%d checksum=%d keyChecksum=%d staticKey=%d)",
+            structPtr, baseAddress, field.offset,
+            instance.safeValue, instance.key, instance.checksum, instance.keyChecksum, staticKey))
         return nil, "checksum_invalid"
     end
 
-    return instance:decode(staticKey)
+    local decoded = instance:decode(staticKey)
+    log(string.format("[get] structPtr=0x%X decoded=%d", structPtr, decoded))
+    return decoded
 end
 
 function M.set(baseAddress, field, value)
@@ -205,13 +224,21 @@ function M.set(baseAddress, field, value)
 end
 
 function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) ~= "number" then return end
+    -- true/false contract — see Int32.collectWrite for why nil broke set().
+    if type(value) ~= "number" then
+        log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: non-number value (%s)",
+            baseAddress, field.offset, type(value)))
+        return false
+    end
     local structPtr, err = Memory.deref(baseAddress, field.offset)
     local needsAlloc = not structPtr or structPtr == 0
 
     if needsAlloc then
         structPtr = ZeroPage.allocate(STRUCT_SIZE)
-        if not structPtr then return end
+        if not structPtr then
+            log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: struct alloc failed", baseAddress, field.offset))
+            return false
+        end
         writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.INT64, value = structPtr }
     end
 
@@ -225,6 +252,7 @@ function M.collectWrite(baseAddress, field, value, writes)
     if needsAlloc then
         writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.INT64, value = structPtr }
     end
+    return true
 end
 
 return M

@@ -14,5 +14,8 @@
 --       public bool runEarly;              // 0x8
 
 return {
-    ["runEarly"] = { offset = 0x8, type = "Bool" },
+    ["runEarly"] = {
+        offset = 0x8,
+        type = "Bool"
+    },
 }

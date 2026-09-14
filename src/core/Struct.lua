@@ -46,10 +46,27 @@ local ZeroPage = loadModule("core/ZeroPage.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.Struct]", ...)
+    if Nebula and Nebula.log then
+        Logfile.log("[Struct]", ...)
     end
+end
+
+local Trace = loadModule("core/Trace.lua")
+
+---Standardized address-trace record — see core/Trace.lua for the
+---key vocabulary. pathPrefix carries the full address chain
+---(e.g. "eventRewards[0]") down through nested Struct.get calls.
+local function rec(tag, kv)
+    Trace.rec("Struct", tag, kv)
+end
+
+---Build a dotted path for trace records ("a[0].b" style chains).
+local function joinPath(prefix, key)
+    if not prefix or prefix == "" then return tostring(key) end
+    return tostring(prefix) .. "." .. tostring(key)
 end
 
 
@@ -84,10 +101,29 @@ local function isReadableArray(field)
     return field.elements ~= nil or field.elementType ~= nil
 end
 
----Shadow a String field with indirect=false.
+--- Resolve the schema used by a nested Object. `elements` references
+--- a shared struct template, while legacy Object fields may still
+--- carry their child fields inline.
+local function nestedTemplate(field)
+    if field.type == "Object" and field.elements ~= nil then
+        return field.elements
+    end
+    return field
+end
+
+---Shadow a String field based on stringDirect ABI flag.
+--   stringDirect = true  -> inline C++ std::string (indirect = false)
+--   stringDirect = false -> proto2 pointer-backed (indirect = true)
+--   stringDirect = nil   -> use field's declared indirect or default
 local function shadowString(field, stringDirect)
-    if stringDirect and field.type == "String" and field.indirect == nil then
+    if field.type ~= "String" then
+        return field
+    end
+    if stringDirect == true and field.indirect == nil then
         return setmetatable({ indirect = false }, { __index = field })
+    end
+    if stringDirect == false and field.indirect == nil then
+        return setmetatable({ indirect = true }, { __index = field })
     end
     return field
 end
@@ -105,6 +141,8 @@ local function isEmptyValue(field, value)
     if field.type == "Enum" then return false end
     if field.type == "Int32" then return false end
     if field.type == "SafeInt32" then return false end
+    if field.type == "SafeInt" then return false end
+    if field.type == "JSONSafeInt" then return false end
     if type(value) == "number" then return value == 0 end
     if type(value) == "string" then return value == "" end
     return false
@@ -129,7 +167,14 @@ local function batchReadArrayHeaders(base, template, stringDirect)
            and isReadableArray(field) then
             local ptr = base + field.offset
             local idx = #specs
-            local isVector = stringDirect or field.container == "vector"
+            -- An explicit container declaration wins; otherwise
+            -- infer from the ABI state (inline ABI family -> vector).
+            local isVector
+            if field.container ~= nil then
+                isVector = (field.container == "vector")
+            else
+                isVector = (stringDirect == true)
+            end
             if isVector then
                 specs[idx + 1] = { address = ptr,        flags = Memory.FLAGS.INT64 }
                 specs[idx + 2] = { address = ptr + 0x8,  flags = Memory.FLAGS.INT64 }
@@ -156,15 +201,29 @@ local function batchReadArrayHeaders(base, template, stringDirect)
 
     for _, m in ipairs(meta) do
         if m.vector then
+            local beginPtr  = values[m.offset]     and values[m.offset].value     or 0
+            local endPtr    = values[m.offset + 1] and values[m.offset + 1].value or 0
+            local capEndPtr = values[m.offset + 2] and values[m.offset + 2].value or 0
+            -- NOTE: this pre-read path bypasses Repeated.readHeader's
+            -- sanity checks (end<begin, size>capacity, bounds), so it
+            -- logs the RAW header values it saw — the earliest place
+            -- a corrupted vector header would surface in the trace.
+            rec("readHeader", { FIELD = m.key,
+                BASE = base, OFF = template[m.key].offset, ADDR = base + template[m.key].offset,
+                PTR = beginPtr, BEGIN = beginPtr, END = endPtr, CAP = capEndPtr,
+                INFO = "preReadHeader" })
             result[m.key] = {
-                beginPtr  = values[m.offset]     and values[m.offset].value     or 0,
-                endPtr    = values[m.offset + 1] and values[m.offset + 1].value or 0,
-                capEndPtr = values[m.offset + 2] and values[m.offset + 2].value or 0,
+                beginPtr  = beginPtr,
+                endPtr    = endPtr,
+                capEndPtr = capEndPtr,
             }
         else
             local arrayPtr = values[m.offset]     and values[m.offset].value     or 0
             local size     = values[m.offset + 1] and values[m.offset + 1].value or 0
             local capacity = values[m.offset + 2] and values[m.offset + 2].value or 0
+            rec("readHeader", { FIELD = m.key,
+                BASE = base, OFF = template[m.key].offset, ADDR = base + template[m.key].offset,
+                PTR = arrayPtr, SIZE = size, CAPACITY = capacity, INFO = "preReadHeader" })
             result[m.key] = {
                 containerPtr = base + template[m.key].offset,
                 arrayPtr  = arrayPtr,
@@ -195,6 +254,8 @@ local function buildPreHeader(field, base, beginPtr, endPtr, capEndPtr)
     if size < 0 then size = 0 end
     if capacity < size then capacity = size end
 
+    rec("readHeader", { FIELD = field.name, ADDR = ptr,
+        PTR = beginPtr, SIZE = size, CAPACITY = capacity, INFO = "preHeader_accepted" })
     return { containerPtr = ptr, arrayPtr = beginPtr, size = size, capacity = capacity }
 end
 
@@ -202,8 +263,9 @@ end
 -- get()
 --==================================================
 
-function M.get(base, template, stringDirect)
-    log(string.format("[get] base=0x%X stringDirect=%s", base, tostring(stringDirect)))
+function M.get(base, template, stringDirect, pathPrefix)
+    rec("get", { PATH = pathPrefix, BASE = base,
+        INFO = "stringDirect=" .. tostring(stringDirect) })
     local result = {}
 
     -- Pre-pass: batch-read all readable Array vector headers in
@@ -223,10 +285,18 @@ function M.get(base, template, stringDirect)
                             if h.beginPtr ~= 0 and h.endPtr > h.beginPtr then
                                 preHeader = buildPreHeader(field, base,
                                     h.beginPtr, h.endPtr, h.capEndPtr)
+                            elseif h.beginPtr ~= 0 then
+                                rec("null", { FIELD = key, ADDR = base + field.offset,
+                                    BEGIN = h.beginPtr, END = h.endPtr,
+                                    ERR = "end_le_begin_treated_empty" })
                             end
                         else
                             if h.arrayPtr ~= 0 and h.size > 0 then
                                 preHeader = h
+                            elseif h.arrayPtr ~= 0 then
+                                rec("null", { FIELD = key, ADDR = base + field.offset,
+                                    PTR = h.arrayPtr, SIZE = h.size,
+                                    ERR = "size_le_zero_treated_empty" })
                             end
                         end
                         if preHeader and preHeader.size > 0 then
@@ -240,12 +310,29 @@ function M.get(base, template, stringDirect)
                     end
                 end
 
-            elseif type(field.type) == "string" and container then
-                -- Pointer-backed container (e.g. lootDefinition)
+            elseif type(field.type) == "string" and (container or (field.type == "Object" and field.elements ~= nil)) then
+                -- Pointer-backed nested Object. `elements` references a
+                -- shared struct template instead of copying its fields.
                 if isOffsetKnown(field) then
                     local ptr = Memory.deref(base, field.offset)
                     if ptr and ptr ~= 0 then
-                        local subResult = M.get(ptr, field, stringDirect)
+                        local childTemplate = nestedTemplate(field)
+                        rec("nested", { PATH = pathPrefix, FIELD = key,
+                            OFF = field.offset, ADDR = base + field.offset,
+                            PTR = ptr, NESTED = ptr,
+                            INFO = "descend:" .. tostring(field.type) })
+                        -- A nested Object field may declare its OWN
+                        -- stringDirect (ABI boundary, e.g. a proto2
+                        -- subtree behind an inline/vector parent).
+                        -- Pick it explicitly — an `and/or` chain
+                        -- falls through on a false override.
+                        local subDirect = stringDirect
+                        if field.stringDirect ~= nil then
+                            subDirect = field.stringDirect
+                            rec("meta", { PATH = joinPath(pathPrefix, key), FIELD = key,
+                                INFO = "abi_override stringDirect=" .. tostring(subDirect) })
+                        end
+                        local subResult = M.get(ptr, childTemplate, subDirect, joinPath(pathPrefix, key))
                         -- Only include non-empty containers
                         if not isEmptyTable(subResult) then
                             result[key] = subResult
@@ -262,13 +349,16 @@ function M.get(base, template, stringDirect)
                         local value = impl.get(base, f)
                         if not isEmptyValue(field, value) then
                             result[key] = value
+                            rec("get", { PATH = joinPath(pathPrefix, key), FIELD = key,
+                                OFF = field.offset, ADDR = base + field.offset,
+                                TYPE = tostring(field.type), VALUE = value })
                         end
                     end
                 end
 
             elseif container then
                 -- Namespace container
-                local subResult = M.get(base, field, stringDirect)
+                local subResult = M.get(base, field, stringDirect, joinPath(pathPrefix, key))
                 if not isEmptyTable(subResult) then
                     result[key] = subResult
                 end
@@ -309,7 +399,7 @@ local function collectWrites(base, template, values, stringDirect, writes)
                     end
                 end
 
-            elseif type(field.type) == "string" and container then
+            elseif type(field.type) == "string" and (container or (field.type == "Object" and field.elements ~= nil)) then
                 if isOffsetKnown(field) then
                     local ptr = Memory.deref(base, field.offset)
                     local needsAlloc = not ptr or ptr == 0
@@ -320,7 +410,14 @@ local function collectWrites(base, template, values, stringDirect, writes)
                         end
                     end
                     if ptr and ptr ~= 0 then
-                        if not collectWrites(ptr, field, value, stringDirect, writes) then
+                        -- Mirror the get-path ABI override: a nested
+                        -- Object field declaring its own stringDirect
+                        -- takes precedence over the walk's state.
+                        local subDirect = stringDirect
+                        if field.stringDirect ~= nil then
+                            subDirect = field.stringDirect
+                        end
+                        if not collectWrites(ptr, nestedTemplate(field), value, subDirect, writes) then
                             allOk = false
                         end
                     else
@@ -369,9 +466,9 @@ function M.set(base, template, values, stringDirect, outWrites)
         local wbOk = Memory.writeBatch(writes)
         if not wbOk then
             if Nebula and Nebula.log then
-                print("[Struct.set] writeBatch FAILED, " .. #writes .. " writes")
+                Logfile.raw("[Struct.set] writeBatch FAILED, " .. #writes .. " writes")
                 for i, w in ipairs(writes) do
-                    print(string.format("  [%d] addr=0x%X flags=%d val=%s", i, w.address, w.flags, tostring(w.value)))
+                    Logfile.raw(string.format("  [%d] addr=0x%X flags=%d val=%s", i, w.address, w.flags, tostring(w.value)))
                 end
             end
             ok = false

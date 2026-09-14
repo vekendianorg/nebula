@@ -1,9 +1,14 @@
+--==================================================
+-- core/types/BitMask.lua
+--==================================================
+
 local BitMask = {}
 
+local Logfile = loadModule("core/Logfile.lua")
 
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.BitMask]", ...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[BitMask]", ...)
     end
 end
 
@@ -64,12 +69,20 @@ end
 function BitMask.get(base, field)
     local Int32 = Nebula.Type.resolve("Int32")
     local value = Int32.get(base, field)
+    if value == nil then
+        log(string.format("[get] at 0x%X offset=0x%X: underlying Int32 read failed", base, field.offset))
+        return BitMask.new(0, loadEnum(field))
+    end
     return BitMask.new(value, loadEnum(field))
 end
 
 function BitMask.set(base, field, value)
     if getmetatable(value) == BitMask then
         value = value:value()
+    elseif type(value) ~= "number" then
+        log(string.format("[set] REJECTED at 0x%X offset=0x%X: value is neither BitMask nor number (%s)",
+            base, field.offset, type(value)))
+        return false
     end
 
     local Int32 = Nebula.Type.resolve("Int32")

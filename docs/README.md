@@ -17,15 +17,13 @@ license.html         License page
 
 css/style.css         All styles, shared across every page
 
-js/particles.js       Background particle animation (shared)
 js/nav.js              Page-transition + active nav-link logic (shared)
-js/hero.js             Home page's title/subtitle/button fade-in
 js/docs.js              Docs page: TOC scroll-spy, mobile TOC toggle, code-block copy buttons + language labels
 js/search.js            Search modal (used on every page, indexes docs.html content)
 
 content/guide.md        Prose documentation source (philosophy, install, usage, etc.)
 content/api/*.md         Per-module API reference source — one file per module.
-                          See content/api/gamestatus.md for the format and
+                          See content/api/playerinfo.md for the format and
                           a full worked example.
 
 scripts/build_docs.py    Regenerates docs.html + assets/search-index.json
@@ -42,12 +40,12 @@ robots.txt, sitemap.xml, site.webmanifest
 
 ## Adding documentation
 
-**Add a function to an existing module** (e.g. a new `GameStatus` method):
-Open `content/api/gamestatus.md`, copy an existing `### Module.func(args)`
+**Add a function to an existing module** (e.g. a new `PlayerInfo` method):
+Open `content/api/playerinfo.md`, copy an existing `### Module.func(args)`
 block, edit it, rerun the build script.
 
 **Document a new module**: Create `content/api/<modulename>.md` following
-the same format (see the comment at the top of `gamestatus.md`). New
+the same format (see the comment at the top of `playerinfo.md`). New
 files under `content/api/` are picked up automatically — nothing else to
 register.
 

@@ -19,10 +19,22 @@
 
 local M = {}
 
+---Normal diagnostic logging, gated by Nebula.log (the global
+---diagnostic switch — see main.lua). NOT Nebula.verbose: that flag
+---gates only vlog()'s per-call timing below.
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.Memory]", ...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[Memory]", ...)
     end
+end
+
+local Trace = loadModule("core/Trace.lua")
+
+---Standardized address-trace record — see core/Trace.lua.
+local function rec(tag, kv)
+    Trace.rec("Memory", tag, kv)
 end
 
 
@@ -42,14 +54,57 @@ M.FLAGS.POINTER = M.FLAGS.INT64
 
 ---Verbose, timed logging for every gg.* round-trip. Off by default
 ---— gated by Nebula.verbose (separate from Nebula.log, which is
----for api/GameStatus.lua's higher-level get/set/dry logging). Use
+---for api/PlayerInfo.lua's higher-level get/set/dry logging). Use
 ---this to see where time is actually going: number of gg calls,
 ---batch sizes, and per-call duration.
 local function vlog(label, count, startTime)
     if Nebula ~= nil and Nebula.verbose then
         local elapsedMs = (os.clock() - startTime) * 1000
-        print(string.format("[Nebula.Memory] %-12s count=%-4d %.2fms", label, count, elapsedMs))
+        Logfile.raw(string.format("[Nebula.Memory] %-12s count=%-4d %.2fms", label, count, elapsedMs))
     end
+end
+
+---Fine-grained raw memory-I/O trace, gated by Nebula.traceMem
+---(default false — set it from your script to enable). Unlike
+---Nebula.log (high-level diagnostic flow) and Nebula.verbose
+---(timing stats), this dumps EVERY address that goes through
+---gg.getValues/setValues together with the raw value read or
+---written, so each line can be cross-checked directly in GG's
+---memory viewer:
+---   [Memory] [read]  addr=0x7A00000100 flags=32/INT64 -> 155640572816 (0x244C60410)
+---   [Memory] [write] addr=0x7A00000108 flags=4/INT32 <- 42
+-- NOTE: M.FLAGS.POINTER is an alias of M.FLAGS.INT64 (both 32), so
+-- it must NOT get its own entry here — a duplicate table key would
+-- silently overwrite the name. GG calls the flag INT64; pointer
+-- reads are visible from context (deref/slot/header reads).
+local FLAG_NAMES = {
+    [M.FLAGS.BYTE]   = "BYTE",
+    [M.FLAGS.WORD]   = "WORD",
+    [M.FLAGS.INT32]  = "INT32",
+    [M.FLAGS.FLOAT]  = "FLOAT",
+    [M.FLAGS.INT64]  = "INT64",
+    [M.FLAGS.DOUBLE] = "DOUBLE",
+}
+
+local function memtrace(...)
+    if Nebula ~= nil and Nebula.traceMem then
+        Logfile.log("[Memory]", ...)
+    end
+end
+
+local function traceValue(flags, v)
+    if v == nil then return "nil" end
+    if type(v) == "number" then
+        if math.type(v) == "integer" then
+            return string.format("%d (0x%X)", v, v)
+        end
+        return string.format("%.6g", v)
+    end
+    return tostring(v)
+end
+
+local function traceFlags(flags)
+    return string.format("%d/%s", flags, FLAG_NAMES[flags] or "?")
 end
 
 ---Read a single value at an address with a given flag.
@@ -58,6 +113,7 @@ end
 ---@return any|nil value, string|nil error
 function M.read(address, flags)
     if address == nil or address == 0 then
+        memtrace(string.format("[read] REJECTED: nil/zero address (flags=%s)", traceFlags(flags or 0)))
         return nil, "nil_address"
     end
 
@@ -68,9 +124,12 @@ function M.read(address, flags)
     vlog("read", 1, startTime)
 
     if not ok or type(result) ~= "table" or result[1] == nil then
+        memtrace(string.format("[read] addr=0x%X flags=%s -> READ FAILED", address, traceFlags(flags)))
         return nil, "read_failed"
     end
 
+    memtrace(string.format("[read] addr=0x%X flags=%s -> %s",
+        address, traceFlags(flags), traceValue(flags, result[1].value)))
     return result[1].value
 end
 
@@ -85,9 +144,17 @@ function M.readBatch(specs)
     vlog("readBatch", #specs, startTime)
 
     if not ok or type(result) ~= "table" then
+        memtrace(string.format("[read] BATCH of %d specs -> READ FAILED", #specs))
         return nil, "read_failed"
     end
 
+    if Nebula ~= nil and Nebula.traceMem then
+        for i, spec in ipairs(specs) do
+            local v = result[i] and result[i].value
+            memtrace(string.format("[read] addr=0x%X flags=%s -> %s",
+                spec.address or 0, traceFlags(spec.flags or 0), traceValue(spec.flags, v)))
+        end
+    end
     return result
 end
 
@@ -98,6 +165,7 @@ end
 ---@return boolean ok
 function M.write(address, flags, value)
     if address == nil or address == 0 then
+        memtrace(string.format("[write] REJECTED: nil/zero address (value=%s)", tostring(value)))
         return false
     end
 
@@ -107,6 +175,8 @@ function M.write(address, flags, value)
     end)
     vlog("write", 1, startTime)
 
+    memtrace(string.format("[write] addr=0x%X flags=%s <- %s%s",
+        address, traceFlags(flags), traceValue(flags, value), ok and "" or " (FAILED)"))
     return ok
 end
 
@@ -119,6 +189,13 @@ function M.writeBatch(specs)
         return gg.setValues(specs)
     end)
     vlog("writeBatch", #specs, startTime)
+
+    if Nebula ~= nil and Nebula.traceMem then
+        for _, spec in ipairs(specs) do
+            memtrace(string.format("[write] addr=0x%X flags=%s <- %s",
+                spec.address or 0, traceFlags(spec.flags or 0), traceValue(spec.flags, spec.value)))
+        end
+    end
 
     -- pcall catches errors; also check gg.setValues return value
     -- (some GG versions return false instead of throwing)
@@ -202,6 +279,8 @@ function M.copyRegion(src, dst, length)
         return true
     end
 
+    memtrace(string.format("[copy] src=0x%X dst=0x%X len=%d", src, dst, length))
+
     local specs = {}
     local offset = 0
     while offset < length do
@@ -238,33 +317,34 @@ end
 function M.deref(baseAddress, offset)
     local ptr, err = M.read(baseAddress + offset, M.FLAGS.POINTER)
     if ptr == nil or ptr == 0 then
+        rec("null", { BASE = baseAddress, OFF = offset, ADDR = "NULL/INVALID",
+            ERR = err or "null_pointer" })
         return nil, err or "null_pointer"
     end
+    rec("deref", { BASE = baseAddress, OFF = offset, ADDR = baseAddress + offset, PTR = ptr })
     return ptr
 end
 
 --==================================================
--- Base address resolution
+-- PlayerInfo base address resolution
 --==================================================
--- Finds the live GameStatus struct in memory by locating the
--- "startup_count" string constant, then walking a fixed chain of
--- pointer derefs to reach the real struct base:
+-- Finds the PlayerInfo object by locating the
+-- "startup_count" string constant, then validating
+-- the referenced object using its known marker.
 --
 --   hit            = AOB match address of "startup_count"
---   ptr            = read(hit + 0x1F, INT64)     -- object holding the string
---   ver            = read(ptr + 0x10, INT32)     -- vtable/version marker
---   typePtr        = read(ptr + 0x80, INT64)     -- pointer to the actual struct
---   base           = read(typePtr, INT32).address -- the struct's own address
+--   ptr            = read(hit + 0x1F, INT64)
+--   ver            = read(ptr + 0x10, INT32)
+--   playerInfoBase = ptr - 0xC8
 --
--- The scan must run per-region (gg.REGION_C_ALLOC / gg.REGION_OTHER)
--- — searching all regions at once misses the hit in some game
--- states, which is why this previously failed.
+-- The scan runs per-region because searching all regions
+-- at once can miss the hit in some game states.
 --
--- Result is cached per script session — see api/GameStatus.lua's
--- resolveBase(), which owns the cache. This function always does
--- a fresh scan; callers are responsible for caching.
+-- This function always performs a fresh scan.
+-- Callers are responsible for caching the result.
 
 local SIGNATURE_HEX = "73 74 61 72 74 75 70 5F 63 6F 75 6E 74" -- "startup_count"
+
 local VALID_VTABLE_MARKERS = {
     [65792]    = true,
     [65793]    = true,
@@ -280,7 +360,7 @@ local function regionName(region)
     return tostring(region)
 end
 
----Scan a single region for GameStatus struct base address hits.
+---Scan a single region for PlayerInfo base address hits.
 ---@param region integer
 ---@return integer[] found
 local function scanRegion(region)
@@ -298,45 +378,84 @@ local function scanRegion(region)
         return found
     end
 
-    for _, hit in ipairs(results) do
+    log(string.format("[scan] PlayerInfo region=%s hits=%d", regionName(region), #results))
+
+    for i, hit in ipairs(results) do
         local ptr = M.read(hit.address + 0x1F, M.FLAGS.INT64)
 
-        if ptr ~= nil and ptr ~= 0 then
-            -- Sanity-check: a real pointer should be in a plausible
-            -- memory range. Values outside this look like ASCII text
-            -- from false-positive AOB matches inside string literals.
-            if ptr >= 0x10000 and ptr <= 0x7FFFFFFFFFFF then
-                local ver = M.read(ptr + 0x10, M.FLAGS.INT32)
-                if ver ~= nil and VALID_VTABLE_MARKERS[ver] then
-                    local typePtr = M.read(ptr + 0x80, M.FLAGS.INT64)
-                    if typePtr ~= nil and typePtr ~= 0 then
-                        -- Reference reads a value AT typePtr just to confirm
-                        -- the address is live/readable, then uses typePtr
-                        -- itself (not the value read) as the resolved base.
-                        local probe = M.read(typePtr, M.FLAGS.INT32)
-                        if probe ~= nil then
-                            table.insert(found, typePtr)
-                        end
-                    end
-                end
+        if ptr == nil or ptr == 0 then
+            log(string.format(
+                "[scan] hit[%d] REJECTED at 0x%X: null object pointer",
+                i - 1, hit.address
+            ))
+        elseif ptr < 0x10000 or ptr > 0x7FFFFFFFFFFF then
+            log(string.format(
+                "[scan] hit[%d] REJECTED at 0x%X: implausible ptr=0x%X",
+                i - 1, hit.address, ptr
+            ))
+        else
+            local ver = M.read(ptr + 0x10, M.FLAGS.INT32)
+            
+            if ver == nil or not VALID_VTABLE_MARKERS[ver] then
+                log(string.format(
+                    "[scan] hit[%d] REJECTED at 0x%X: ptr=0x%X marker=0x%X not valid",
+                    i - 1, hit.address, ptr, ver or 0
+                ))
+            else
+                local playerInfoBase = ptr - 0xC8
+            
+                log(string.format(
+                    "[scan] hit[%d] ACCEPTED at 0x%X: ptr=0x%X marker=0x%X PlayerInfo=0x%X",
+                    i - 1, hit.address, ptr, ver, playerInfoBase
+                ))
+            
+                table.insert(found, playerInfoBase)
             end
         end
     end
 
+    log(string.format(
+        "[scan] PlayerInfo region=%s accepted=%d",
+        regionName(region), #found
+    ))
+
     return found
 end
 
----Scan process memory for the GameStatus struct base address.
+---Scan process memory for the PlayerInfo base address.
 ---Expensive — call once per session and cache the result.
 ---@return integer[]|nil addresses, string|nil error
-function M.resolveGameStatusBase()
+function M.resolvePlayerInfoBase()
     for _, region in ipairs(M.SEARCH_REGIONS) do
         local ok, found = pcall(scanRegion, region)
+
         if ok and found and #found > 0 then
+            log(string.format(
+                "[resolve] PlayerInfo base resolved via %s: %d candidate(s): %s",
+                regionName(region),
+                #found,
+                table.concat((function()
+                    local s = {}
+                    for i, a in ipairs(found) do
+                        s[i] = string.format("0x%X", a)
+                    end
+                    return s
+                end)(), ", ")
+            ))
+
             return found
+        end
+
+        if not ok then
+            log(string.format(
+                "[resolve] PlayerInfo scan FAILED in %s: %s",
+                regionName(region),
+                tostring(found)
+            ))
         end
     end
 
+    log("[resolve] PlayerInfo base resolution FAILED: no_valid_matches (all regions exhausted)")
     return nil, "no_valid_matches"
 end
 
@@ -380,6 +499,7 @@ local function validateEventAddress(addr)
 
     local results, err = M.readBatch(specs)
     if not results or #results < 3 then
+        log(string.format("[validate] 0x%X REJECTED: batch read failed (%s)", addr or 0, tostring(err)))
         return false
     end
 
@@ -389,22 +509,28 @@ local function validateEventAddress(addr)
 
     -- contentVersion: small positive number
     if contentVersion == nil or contentVersion < 0 or contentVersion > 10000 then
+        log(string.format("[validate] 0x%X REJECTED: contentVersion=%s out of range", addr, tostring(contentVersion)))
         return false
     end
 
     -- startTime / endTime: plausible Unix timestamps
     if startTime == nil or startTime < MIN_TIMESTAMP then
+        log(string.format("[validate] 0x%X REJECTED: startTime=%s < %d", addr, tostring(startTime), MIN_TIMESTAMP))
         return false
     end
     if endTime == nil or endTime < MIN_TIMESTAMP then
+        log(string.format("[validate] 0x%X REJECTED: endTime=%s < %d", addr, tostring(endTime), MIN_TIMESTAMP))
         return false
     end
 
     -- Valid event window
     if startTime >= endTime then
+        log(string.format("[validate] 0x%X REJECTED: startTime=%d >= endTime=%d", addr, startTime, endTime))
         return false
     end
 
+    log(string.format("[validate] 0x%X ACCEPTED: contentVersion=%d startTime=%d endTime=%d",
+        addr, contentVersion, startTime, endTime))
     return true
 end
 
@@ -437,10 +563,14 @@ local function resolveWithCache(cacheId, aobBases, validator)
         cached = {}
     end
 
+    rec("cache", { ID = cacheId, MODE = "merge", INFO = "cached=" .. #cached .. " aob=" .. #aobBases })
+
     local validCached = {}
     for _, addr in ipairs(cached) do
         if validator(addr) then
             validCached[#validCached + 1] = addr
+        else
+            rec("null", { ID = cacheId, ADDR = addr, ERR = "cached_dropped_validation_failed" })
         end
     end
 
@@ -448,8 +578,13 @@ local function resolveWithCache(cacheId, aobBases, validator)
     for _, addr in ipairs(aobBases) do
         if validator(addr) then
             validAob[#validAob + 1] = addr
+        else
+            rec("null", { ID = cacheId, ADDR = addr, ERR = "aob_dropped_validation_failed" })
         end
     end
+
+    rec("cache", { ID = cacheId, MODE = "merge",
+        INFO = "validCached=" .. #validCached .. " validAob=" .. #validAob })
 
     -- 4. Merge + deduplicate
     local seen = {}
@@ -472,6 +607,9 @@ local function resolveWithCache(cacheId, aobBases, validator)
         Cache.save(cacheId, combined)
     end
 
+    rec("cache", { ID = cacheId, MODE = "save", HIT = 1,
+        INFO = "combined=" .. #combined,
+        ADDR = combined[1] })
     return combined
 end
 
@@ -519,10 +657,19 @@ function M.findTeamEventBases()
             for _, hit in ipairs(results) do
                 bases[#bases + 1] = hit.address - TEAM_EVENT_SIGNATURE_OFFSET
             end
+            log(string.format("[scan] TeamEvent %s hits=%d -> %d base(s): %s",
+                regionName(region), #results, #bases,
+                (function()
+                    local s = {}
+                    for i, a in ipairs(bases) do s[i] = string.format("0x%X", a) end
+                    return table.concat(s, ", ")
+                end)()))
             return bases
         end
+        log(string.format("[scan] TeamEvent %s: no signature hits", regionName(region)))
     end
 
+    log("[resolve] TeamEvent scan FAILED: signature_not_found (all regions exhausted)")
     return nil, "signature_not_found"
 end
 
@@ -542,6 +689,7 @@ function M.resolveActiveTeamEventBase()
     local combined = resolveWithCache("team_event_addresses", aobBases)
 
     if #combined == 0 then
+        log("[resolve] TeamEvent no candidate base addresses survived the merge")
         return nil, "no_active_team_event"
     end
 
@@ -555,6 +703,7 @@ function M.resolveActiveTeamEventBase()
 
     local readValues, readErr = M.readBatch(readList)
     if not readValues then
+        log(string.format("[resolve] TeamEvent window read FAILED: %s", tostring(readErr)))
         return nil, readErr
     end
 
@@ -562,8 +711,12 @@ function M.resolveActiveTeamEventBase()
         local startTime = readValues[i * 2 - 1].value
         local endTime = readValues[i * 2].value
         if startTime ~= nil and endTime ~= nil and startTime < currentTime and currentTime < endTime then
+            log(string.format("[resolve] TeamEvent base=0x%X is ACTIVE (startTime=%d endTime=%d now=%d)",
+                combined[i], startTime, endTime, currentTime))
             return combined[i]
         end
+        log(string.format("[resolve] TeamEvent candidate[%d] base=0x%X not in active window (startTime=%s endTime=%s now=%d)",
+            i, combined[i], tostring(startTime), tostring(endTime), currentTime))
     end
 
     return nil, "no_active_team_event"
@@ -605,10 +758,19 @@ function M.findPublicEventBases()
             for _, hit in ipairs(results) do
                 bases[#bases + 1] = hit.address - PUBLIC_EVENT_SIGNATURE_OFFSET
             end
+            log(string.format("[scan] PublicEvent %s hits=%d -> %d base(s): %s",
+                regionName(region), #results, #bases,
+                (function()
+                    local s = {}
+                    for i, a in ipairs(bases) do s[i] = string.format("0x%X", a) end
+                    return table.concat(s, ", ")
+                end)()))
             return bases
         end
+        log(string.format("[scan] PublicEvent %s: no signature hits", regionName(region)))
     end
 
+    log("[resolve] PublicEvent scan FAILED: signature_not_found (all regions exhausted)")
     return nil, "signature_not_found"
 end
 
@@ -627,6 +789,7 @@ function M.resolveActivePublicEventBase()
     local combined = resolveWithCache("public_event_addresses", aobBases)
 
     if #combined == 0 then
+        log("[resolve] PublicEvent no candidate base addresses survived the merge")
         return nil, "no_active_public_event"
     end
 
@@ -640,6 +803,7 @@ function M.resolveActivePublicEventBase()
 
     local readValues, readErr = M.readBatch(readList)
     if not readValues then
+        log(string.format("[resolve] PublicEvent window read FAILED: %s", tostring(readErr)))
         return nil, readErr
     end
 
@@ -647,8 +811,12 @@ function M.resolveActivePublicEventBase()
         local startTime = readValues[i * 2 - 1].value
         local endTime = readValues[i * 2].value
         if startTime ~= nil and endTime ~= nil and startTime < currentTime and currentTime < endTime then
+            log(string.format("[resolve] PublicEvent base=0x%X is ACTIVE (startTime=%d endTime=%d now=%d)",
+                combined[i], startTime, endTime, currentTime))
             return combined[i]
         end
+        log(string.format("[resolve] PublicEvent candidate[%d] base=0x%X not in active window (startTime=%s endTime=%s now=%d)",
+            i, combined[i], tostring(startTime), tostring(endTime), currentTime))
     end
 
     return nil, "no_active_public_event"
@@ -732,16 +900,28 @@ function M.findCommunityEventBases()
         for i, hit in ipairs(results) do
             if markerResults[i] and markerResults[i].value == COMMUNITY_EVENT_VTABLE_MARKER then
                 bases[#bases + 1] = hit.address - COMMUNITY_EVENT_NAME_OFFSET
+            else
+                log(string.format("[scan] CommunityEvent hit[%d] REJECTED at 0x%X: marker=0x%X != 0x%X",
+                    i - 1, hit.address,
+                    markerResults[i] and markerResults[i].value or 0, COMMUNITY_EVENT_VTABLE_MARKER))
             end
         end
 
         if #bases > 0 then
+            log(string.format("[scan] CommunityEvent %s: %d hit(s) -> %d base(s): %s",
+                regionName(region), #results, #bases,
+                (function()
+                    local s = {}
+                    for i, a in ipairs(bases) do s[i] = string.format("0x%X", a) end
+                    return table.concat(s, ", ")
+                end)()))
             return bases
         end
 
         ::nextRegion::
     end
 
+    log("[resolve] CommunityEvent scan FAILED: signature_not_found (all regions exhausted)")
     return nil, "signature_not_found"
 end
 
@@ -767,6 +947,7 @@ function M.resolveActiveCommunityEventBase()
     local combined = resolveWithCache("community_event_addresses", scanBases, validateCommunityEventAddress)
 
     if #combined == 0 then
+        log("[resolve] CommunityEvent no candidate base addresses survived the merge")
         return nil, "no_active_community_event"
     end
 
@@ -780,6 +961,7 @@ function M.resolveActiveCommunityEventBase()
 
     local readValues, readErr = M.readBatch(readList)
     if not readValues then
+        log(string.format("[resolve] CommunityEvent window read FAILED: %s", tostring(readErr)))
         return nil, readErr
     end
 
@@ -787,18 +969,149 @@ function M.resolveActiveCommunityEventBase()
         local startTime = readValues[i * 2 - 1].value
         local endTime = readValues[i * 2].value
         if startTime ~= nil and endTime ~= nil and startTime < currentTime and currentTime < endTime then
+            log(string.format("[resolve] CommunityEvent base=0x%X is ACTIVE (startTime=%d endTime=%d now=%d)",
+                combined[i], startTime, endTime, currentTime))
             return combined[i]
         end
+        log(string.format("[resolve] CommunityEvent candidate[%d] base=0x%X not in active window (startTime=%s endTime=%s now=%d)",
+            i, combined[i], tostring(startTime), tostring(endTime), currentTime))
     end
 
     -- No active event found — if there's only one result, return it
     -- anyway (CommunityShowcase may not have startTime/endTime set
     -- the same way as PublicEvent/TeamEvent).
     if #combined == 1 then
+        log(string.format("[resolve] CommunityEvent: no active window, returning sole candidate base=0x%X", combined[1]))
         return combined[1]
     end
 
     return nil, "no_active_community_event"
+end
+
+
+--==================================================
+-- GameData base resolution
+--==================================================
+-- GameData is a static configuration object. The supplied signature
+-- starts at offset 0x20 (partialJsonApplied) and covers the early
+-- configuration fields through collectible/gameplay defaults.
+
+local GAME_DATA_SIGNATURE_HEX =
+    "00 01 00 00 00 00 48 42 02 00 00 00 00 00 60 40 " ..
+    "00 00 A0 41 00 00 A0 41 00 00 50 41 00 40 1C 46 " ..
+    "00 00 A0 40 00 00 C0 40 00 00 00 40"
+local GAME_DATA_SIGNATURE_OFFSET = 0x20
+
+---Scan process memory for GameData struct bases.
+---@return integer[]|nil bases, string|nil error
+function M.findGameDataBase()
+    local allBases = {}
+
+    -- GameData is stored exclusively in C_BSS. Do not scan the
+    -- general dynamic/other regions for this singleton.
+    local regions = { gg.REGION_C_BSS }
+    for _, region in ipairs(regions) do
+        gg.clearResults()
+        gg.setRanges(region)
+        gg.searchNumber("h " .. GAME_DATA_SIGNATURE_HEX, 1)
+        gg.refineNumber("h 00 01", 1)
+        gg.refineNumber("h 00", 1)
+        
+        local results = gg.getResults(gg.getResultsCount())
+        gg.clearResults()
+
+        if results and #results > 0 then
+            local bases = {}
+            for _, hit in ipairs(results) do
+                bases[#bases + 1] = hit.address - GAME_DATA_SIGNATURE_OFFSET
+            end
+
+            log(string.format("[scan] GameData %s: %d hit(s) -> %d base(s): %s",
+                regionName(region), #results, #bases,
+                (function()
+                    local out = {}
+                    for i, a in ipairs(bases) do
+                        out[i] = string.format("0x%X", a)
+                    end
+                    return table.concat(out, ", ")
+                end)()))
+
+            for _, addr in ipairs(bases) do
+                allBases[#allBases + 1] = addr
+            end
+        else
+            log(string.format("[scan] GameData %s: no signature hits", regionName(region)))
+        end
+    end
+
+    if #allBases == 0 then
+        log("[resolve] GameData scan FAILED: signature_not_found")
+        return nil, "signature_not_found"
+    end
+
+    return allBases
+end
+
+---Lightweight validation for cached GameData bases. The complete
+---signature is used by findGameDataBase(); cached entries only need
+---to retain the characteristic early fields before being reused.
+local function validateGameDataAddress(addr)
+    if type(addr) ~= "number" or addr == 0 then
+        return false
+    end
+
+    local specs = {
+        { address = addr + 0x20, flags = M.FLAGS.BYTE },   -- partialJsonApplied
+        { address = addr + 0x21, flags = M.FLAGS.BYTE },   -- seasonsEnabled
+        { address = addr + 0x24, flags = M.FLAGS.FLOAT },  -- seasonsUnlockRank
+        { address = addr + 0x28, flags = M.FLAGS.INT32 },  -- gdprVersion
+        { address = addr + 0x2C, flags = M.FLAGS.FLOAT },  -- adventureUnlockRank
+    }
+
+    local values = M.readBatch(specs)
+    if not values or #values < #specs then
+        return false
+    end
+
+    local seasons = values[2] and values[2].value
+    local rank = values[3] and values[3].value
+    local gdpr = values[4] and values[4].value
+    local adventure = values[5] and values[5].value
+
+    if seasons == nil or (seasons ~= 0 and seasons ~= 1) then
+        return false
+    end
+    if rank == nil or rank ~= rank or math.abs(rank) > 100000 then
+        return false
+    end
+    if gdpr == nil or gdpr < 0 or gdpr > 1000000 then
+        return false
+    end
+    if adventure == nil or adventure ~= adventure or math.abs(adventure) > 100000 then
+        return false
+    end
+
+    return true
+end
+
+---Resolve the GameData struct base.
+---@return integer|nil base, string|nil error
+function M.resolveGameDataBase()
+    -- The AOB scan is authoritative for fresh discovery. Cache is only
+    -- supplementary and is validated before reuse.
+    local aobBases = M.findGameDataBase() or {}
+    local combined = resolveWithCache("game_data_addresses", aobBases, validateGameDataAddress)
+
+    if #combined == 0 then
+        log("[resolve] GameData no candidate base addresses survived validation")
+        return nil, "no_game_data"
+    end
+
+    -- GameData should be a singleton. Preserve the first validated base
+    -- rather than pretending multiple candidates represent active variants.
+    local base = combined[1]
+    log(string.format("[resolve] GameData base=0x%X", base))
+    return base
 end
 
 return M

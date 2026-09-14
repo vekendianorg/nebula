@@ -2,8 +2,10 @@
 
 Read and write fields off whichever `CommunityEvent` (CommunityShowcase)
 struct is currently active in memory. Like the other event modules,
-every method is metadata-driven — the field list comes from
-`metadata/CommunityEvent.lua`. Unlike `PublicEvent` and `TeamEvent`
+every method is metadata-driven — the field list comes from the same
+shared `metadata/<version>/structs/EventDefinition.lua` snapshot used
+by `PublicEvent` and `TeamEvent` (see
+[Versioned metadata](#versioned-metadata)). Unlike `PublicEvent` and `TeamEvent`
 which use AOB byte-signature scanning, CommunityEvent uses
 string-search resolution: it searches for the ASCII bytes of
 `"community Showcase\0"` and validates hits via a vtable marker
@@ -18,7 +20,7 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/CommunityEvent.lua`, e.g. `"startTime"` or `"sessionEntry.entryFeeTickets"`
+- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"sessionEntry.entryFeeTickets"`
 
 **Returns**
 
@@ -70,7 +72,7 @@ Nebula.CommunityEvent.set("startTime", 1700000000):dry()
 
 Lists every field's dotted id that has a verified (non-placeholder)
 offset. Fields still at the `0xBAAD` placeholder in
-`metadata/CommunityEvent.lua` are excluded.
+`metadata/<version>/structs/EventDefinition.lua` are excluded.
 
 **Returns**
 
@@ -93,11 +95,11 @@ value.
 
 **Returns**
 
-(table) — `{ type, offset, repeated, known }`
+(table) — `{ name, type, offset, repeated, known, address }` — `address` is only populated once a base has been resolved
 
 ```lua
 local meta = Nebula.CommunityEvent.meta("minRankToJoin")
-print(meta.type, meta.offset, meta.known)
+print(meta.name, meta.type, meta.offset, meta.known)
 ```
 
 > **Offset verification status**: CommunityEvent's offsets have been

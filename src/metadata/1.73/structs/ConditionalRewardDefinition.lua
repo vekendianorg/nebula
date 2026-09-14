@@ -35,19 +35,13 @@ local M = {
     },
     ["lootDefinition"] = {
         offset = 0x20,
-        type = "Object"
+        type = "Object",
+        elements = LootDefinition
     },
     ["maxCollectAmount"] = {
         offset = 0x28,
         type = "Int32"
     }
 }
-
--- Inline the LootDefinition child layout into the Object field
--- (children offsets are LootDefinition-relative — the field is a
--- pointer-backed nested object).
-for k, v in pairs(LootDefinition) do
-    M.lootDefinition[k] = v
-end
 
 return M

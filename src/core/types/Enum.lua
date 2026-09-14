@@ -1,35 +1,19 @@
 --==================================================
 -- core/types/Enum.lua
 --==================================================
--- Int32 field backed by a bidirectional enum mapping. Reads an
--- Int32 from memory and converts to the schema string name; writes
--- a string name back as the Int32 enum value.
---
--- The enum table is loaded from
--- metadata/<version>/enums/<field.enum>.lua via metadata/manifest.lua
--- (or used inline if field.enum is a table). It must expose:
---   byId[number]   → string name
---   byName[string] → number id
---
--- Metadata usage:
---   { offset = 0x18, type = "Enum", enum = "ChestType" }
---
--- get returns the string name (e.g. "rare") or the raw number
--- if the ID is not in the enum table.
--- set accepts either the string name or the raw number.
 
 local Memory = loadModule("core/Memory.lua")
 local Manifest = loadModule("metadata/manifest.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.Enum]", ...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[Enum]", ...)
     end
 end
-
-
 
 local function loadEnum(field)
     if type(field.enum) == "table" then
@@ -41,73 +25,65 @@ local function loadEnum(field)
     return Manifest.loadEnum(field.enum)
 end
 
----@param baseAddress integer
----@param field table @ { offset, enum } from metadata
----@return string|integer|nil value, string|nil error
 function M.get(baseAddress, field)
     local raw, err = Memory.read(baseAddress + field.offset, Memory.FLAGS.INT32)
     if err then return nil, err end
     if raw == 0 and field.allowZero == false then
+        log(string.format("[get] at 0x%X offset=0x%X: raw=0 suppressed by allowZero=false", baseAddress, field.offset))
         return nil, nil
     end
-
     local enum = loadEnum(field)
     local name = enum.byId and enum.byId[raw]
     if name ~= nil then
         return name
     end
-    -- Unknown ID: return the raw number so caller can see it
+    if raw ~= 0 then
+        log(string.format("[get] at 0x%X offset=0x%X: raw=%d not in enum '%s', returning raw",
+            baseAddress, field.offset, raw, tostring(field.enum)))
+    end
     return raw
 end
 
----@param baseAddress integer
----@param field table
----@param value string|integer @ enum name or raw Int32
----@return boolean ok
 function M.set(baseAddress, field, value)
     local raw
-
     if type(value) == "string" then
         local enum = loadEnum(field)
         raw = enum.byName and enum.byName[value]
         if raw == nil then
+            log(string.format("[set] REJECTED at 0x%X offset=0x%X: unknown enum name '%s' in '%s'",
+                baseAddress, field.offset, value, tostring(field.enum)))
             error(("Enum: unknown name '%s'"):format(value))
         end
     elseif type(value) == "number" then
         raw = math.floor(value)
     else
+        log(string.format("[set] REJECTED at 0x%X offset=0x%X: non-string/number value (%s)",
+            baseAddress, field.offset, type(value)))
         return false
     end
-
-    function M.collectWrite(baseAddress, field, value, writes)
-    local raw
-    if type(value) == "string" then
-        local enum = loadEnum(field)
-        raw = enum.byName and enum.byName[value]
-        if raw == nil then return end
-    elseif type(value) == "number" then
-        raw = math.floor(value)
-    else
-        return
-    end
-    writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.INT32, value = raw }
-end
-
-return Memory.write(baseAddress + field.offset, Memory.FLAGS.INT32, raw)
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.INT32, raw)
 end
 
 function M.collectWrite(baseAddress, field, value, writes)
     local raw
+    -- true/false contract — see Int32.collectWrite for why nil broke set().
     if type(value) == "string" then
         local enum = loadEnum(field)
         raw = enum.byName and enum.byName[value]
-        if raw == nil then return end
+        if raw == nil then
+            log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: unknown enum name '%s' in '%s'",
+                baseAddress, field.offset, value, tostring(field.enum)))
+            return false
+        end
     elseif type(value) == "number" then
         raw = math.floor(value)
     else
-        return
+        log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: non-string/number value (%s)",
+            baseAddress, field.offset, type(value)))
+        return false
     end
     writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.INT32, value = raw }
+    return true
 end
 
 return M

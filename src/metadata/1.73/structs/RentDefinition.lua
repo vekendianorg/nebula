@@ -17,7 +17,16 @@
 --       public int duration;        // 0x20
 
 return {
-    ["currency"] = { offset = 0x0, type = "String" },
-    ["amount"] = { offset = 0x18, type = "Int32" },
-    ["duration"] = { offset = 0x20, type = "Int32" },
+    ["currency"] = {
+        offset = 0x0,
+        type = "String"
+    },
+    ["amount"] = {
+        offset = 0x18,
+        type = "Int32"
+    },
+    ["duration"] = {
+        offset = 0x20,
+        type = "Int32"
+    },
 }

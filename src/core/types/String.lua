@@ -1,11 +1,17 @@
+--==================================================
+-- core/types/String.lua
+--==================================================
+
 local Memory = loadModule("core/Memory.lua")
 local ZeroPage = loadModule("core/ZeroPage.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.String]", ...)
+    if Nebula and Nebula.log then
+        Logfile.log("[String]", ...)
     end
 end
 
@@ -50,6 +56,15 @@ local function readInline(ptr)
     end
 
     local byteCount = math.floor(toUnsignedByte(lenRaw) / 2)
+    -- Format bound, not a heuristic: the long form's marker range
+    -- (LONG_HEADER_MIN..LONG_HEADER_MAX, i.e. len*2+1 up to 99) already
+    -- covers every string of more than (99-1)//2 chars. An inline
+    -- length above that can only come from reading a non-string
+    -- memory region (e.g. a pointer field misread as a string) —
+    -- reject it instead of dumping raw bytes as a "value".
+    if byteCount > (LONG_HEADER_MAX - 1) // 2 then
+        return nil, "inline_length_excessive"
+    end
     return readRawBytes(ptr + 1, byteCount)
 end
 
@@ -160,6 +175,7 @@ local function writeLong(ptr, nameBytes, byteCount)
         header = (n * n) | 1
         dataPtr = ZeroPage.allocate(byteCount + 1)
         if not dataPtr then
+            log(string.format("[set] writeLong at 0x%X: dataPtr alloc FAILED for %d bytes", ptr, byteCount + 1))
             return false
         end
     end
@@ -194,10 +210,12 @@ function M.set(baseAddress, field, value)
         -- indirect == false means baseAddress+offset IS the string
         -- storage (no separate object to allocate) — nothing we can do.
         if field.indirect == false then
+            log(string.format("[set] REJECTED at 0x%X offset=0x%X: null string ptr and indirect==false (cannot allocate)", baseAddress, field.offset))
             return false
         end
         ptr = ZeroPage.allocate(STRING_OBJECT_SIZE)
         if not ptr then
+            log(string.format("[set] REJECTED at 0x%X offset=0x%X: string object alloc FAILED", baseAddress, field.offset))
             return false
         end
     end

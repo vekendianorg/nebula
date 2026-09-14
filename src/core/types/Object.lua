@@ -1,8 +1,10 @@
-
-
-local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.Object]", ...)
-    end
-end
-
+--==================================================
+-- core/types/Object.lua
+--==================================================
+-- Intentionally EMPTY placeholder. "Object" (pointer-backed nested
+-- struct) is not a Type-registry scalar: Object fields are handled
+-- by the deref + nested-message paths in core/Field.lua and
+-- core/Struct.lua BEFORE Type.resolve() is ever consulted. Nothing
+-- loads this file; it exists only so the types/ directory doesn't
+-- lose the name. The old verbose-gated log() stub here was dead
+-- (never called) and has been removed.

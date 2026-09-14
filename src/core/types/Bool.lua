@@ -1,23 +1,19 @@
 --==================================================
 -- core/types/Bool.lua
 --==================================================
--- Single-byte boolean field (proto2 `bool`). Stored as 0x00/0x01.
 
 local Memory = loadModule("core/Memory.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.Bool]", ...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[Bool]", ...)
     end
 end
 
-
-
----@param baseAddress integer
----@param field table
----@return boolean|nil value, string|nil error
 function M.get(baseAddress, field)
     local raw, err = Memory.read(baseAddress + field.offset, Memory.FLAGS.BYTE)
     if raw == nil then
@@ -26,27 +22,24 @@ function M.get(baseAddress, field)
     return raw ~= 0
 end
 
----@param baseAddress integer
----@param field table
----@param value boolean
----@return boolean ok
 function M.set(baseAddress, field, value)
     if type(value) ~= "boolean" then
+        log(string.format("[set] REJECTED at 0x%X offset=0x%X: non-boolean value (%s)",
+            baseAddress, field.offset, type(value)))
         return false
     end
-    function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) == "boolean" then
-        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.BYTE, value = value and 1 or 0 }
-    end
-end
-
-return Memory.write(baseAddress + field.offset, Memory.FLAGS.BYTE, value and 1 or 0)
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.BYTE, value and 1 or 0)
 end
 
 function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) == "boolean" then
-        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.BYTE, value = value and 1 or 0 }
+    -- true/false contract — see Int32.collectWrite for why nil broke set().
+    if type(value) ~= "boolean" then
+        log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: non-boolean value (%s)",
+            baseAddress, field.offset, type(value)))
+        return false
     end
+    writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.BYTE, value = value and 1 or 0 }
+    return true
 end
 
 return M

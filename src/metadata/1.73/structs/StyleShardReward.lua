@@ -15,8 +15,21 @@
 --       public int amount;       // 0x34
 
 return {
-    ["itemId"] = { offset = 0x0, type = "String" },
-    ["vehicleId"] = { offset = 0x18, type = "String" },
-    ["rarity"] = { offset = 0x30, type = "Int32" },
-    ["amount"] = { offset = 0x34, type = "Int32" },
+    ["itemId"] = {
+        offset = 0x0,
+        type = "String"
+    },
+    ["vehicleId"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["rarity"] = {
+        offset = 0x30,
+        type = "Enum",
+        enum = "Rarity"
+    },
+    ["amount"] = {
+        offset = 0x34,
+        type = "Int32"
+    },
 }

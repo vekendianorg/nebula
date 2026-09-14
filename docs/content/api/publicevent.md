@@ -1,9 +1,11 @@
 ## PublicEvent
 
-Read fields off whichever `PublicEvent` struct is currently active in
-memory. Like `GameStatus`, every method is metadata-driven — the
-field list comes from `metadata/PublicEvent.lua`, not from hardcoded
-offsets in this module. Unlike `GameStatus`'s single fixed struct,
+Read and write fields off whichever `PublicEvent` struct is currently
+active in memory. Like `GameStatus`, every method is metadata-driven —
+the field list comes from `metadata/<version>/structs/EventDefinition.lua`,
+the single shared struct backing `PublicEvent`, `TeamEvent`, and
+`CommunityEvent` (see [Versioned metadata](#versioned-metadata)), not
+from hardcoded offsets in this module. Unlike `GameStatus`'s single fixed struct,
 there can be several `PublicEvent` instances in memory at once
 (past/current/upcoming events); base resolution picks out whichever
 one's `startTime`/`endTime` window contains the current time — see
@@ -17,7 +19,7 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/PublicEvent.lua`, e.g. `"startTime"` or `"gameMode.duration"`
+- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"gameMode.duration"`
 
 **Returns**
 
@@ -48,11 +50,30 @@ event.get("minTeamSizeToJoin")
 event.get("gameMode.pointsSystem.gemsToPointsConversion")
 ```
 
+### PublicEvent.set(fieldName, value)
+
+Writes a field value to the currently-active PublicEvent struct.
+Returns a chainable operation object supporting `:dry()`.
+
+**Parameters**
+
+- `fieldName` (string) — the field's dotted name
+- `value` (number | string | table) — the value to write
+
+**Returns**
+
+(table) — a chainable operation object; already executed
+
+```lua
+Nebula.PublicEvent.set("startTime", 1700000000)
+Nebula.PublicEvent.set("startTime", 1700000000):dry()
+```
+
 ### PublicEvent.fields()
 
 Lists every field's dotted id that has a verified (non-placeholder)
 offset. Fields still at the `0xBAAD` placeholder in
-`metadata/PublicEvent.lua`, and per-element `Array` templates (see
+`metadata/<version>/structs/EventDefinition.lua`, and per-element `Array` templates (see
 [Per-element templates](#per-element-templates-elements)), are
 excluded.
 

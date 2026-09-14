@@ -1,13 +1,27 @@
+--==================================================
+-- core/Repeated.lua
+--==================================================
+
 local Memory = loadModule("core/Memory.lua")
 local Type   = loadModule("core/Type.lua")
 local ZeroPage = loadModule("core/ZeroPage.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.Repeated]", ...)
+    if Nebula and Nebula.log then
+        Logfile.log("[Repeated]", ...)
     end
+end
+
+local Trace = loadModule("core/Trace.lua")
+
+---Standardized address-trace record — see core/Trace.lua for the
+---key vocabulary (ADDR/OFF/PTR/BEGIN/END/CAP/ELEM/NESTED/...).
+local function rec(tag, kv)
+    Trace.rec("Repeated", tag, kv)
 end
 
 
@@ -22,7 +36,7 @@ local function isPointerElement(elementType)
     if POINTER_ELEMENT_TYPES[elementType] then
         return true
     end
-    local INLINE_SCALARS = { Int32 = true, Bool = true, Float = true, String = true, BitMask = true, Enum = true }
+    local INLINE_SCALARS = { Int32 = true, Int64 = true, Bool = true, Float = true, String = true, BitMask = true, Enum = true, Vec2 = true, Color3B = true }
     return not INLINE_SCALARS[elementType]
 end
 
@@ -32,6 +46,12 @@ local function readHeader(baseAddress, field)
     local ptr = baseAddress + field.offset
     local stride = field.elementStride or DEFAULT_STRIDE
 
+    rec("readHeader", {
+        BASE = baseAddress, OFF = field.offset, ADDR = ptr,
+        CONT = tostring(field.container), TYPE = tostring(field.type),
+        ELEM_TYPE = field.elementType, STRIDE = stride,
+    })
+
     if field.container == "vector" then
         local fields, readErr = Memory.readBatch({
             { address = ptr,        flags = Memory.FLAGS.INT64 },
@@ -40,6 +60,7 @@ local function readHeader(baseAddress, field)
         })
 
         if not fields then
+            rec("null", { ADDR = "NULL/INVALID", ERR = "vector_header_read_failed: " .. tostring(readErr) })
             return nil, readErr
         end
 
@@ -48,14 +69,19 @@ local function readHeader(baseAddress, field)
         local capEndPtr = fields[3] and fields[3].value
 
         if beginPtr == nil or endPtr == nil then
+            rec("null", { ADDR = "NULL/INVALID", ERR = "nil_begin_or_end" })
             return nil, "header_read_failed"
         end
 
         if beginPtr == 0 then
+            rec("readHeader", { ADDR = ptr, PTR = 0, BEGIN = 0, END = endPtr or 0, CAP = capEndPtr or 0,
+                SIZE = 0, CAPACITY = 0, INFO = "empty_vector" })
             return { containerPtr = ptr, arrayPtr = 0, size = 0, capacity = 0 }
         end
 
         if endPtr < beginPtr then
+            rec("null", { ADDR = ptr, BEGIN = beginPtr, END = endPtr,
+                ERR = "vector_end_before_begin" })
             return nil, string.format(
                 "vector_end_before_begin (begin=0x%X end=0x%X)",
                 beginPtr, endPtr)
@@ -67,17 +93,26 @@ local function readHeader(baseAddress, field)
             capacity = math.floor((capEndPtr - beginPtr) / stride)
         end
 
+        rec("readHeader", { ADDR = ptr, PTR = beginPtr, BEGIN = beginPtr, END = endPtr,
+            CAP = capEndPtr or 0, SIZE = size, CAPACITY = capacity })
+
         if size < 0 or capacity < 0 then
+            rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+                ERR = "header_negative_size_or_capacity" })
             return nil, "header_negative_size_or_capacity"
         end
 
         if size > MAX_TRUSTED_ELEMENT_COUNT or capacity > MAX_TRUSTED_ELEMENT_COUNT then
+            rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+                ERR = "header_size_out_of_bounds" })
             return nil, string.format(
                 "header_size_out_of_bounds (size=%d capacity=%d, max=%d)",
                 size, capacity, MAX_TRUSTED_ELEMENT_COUNT)
         end
 
         if size > capacity then
+            rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+                ERR = "header_size_exceeds_capacity" })
             return nil, string.format("header_size_exceeds_capacity (size=%d capacity=%d)", size, capacity)
         end
 
@@ -91,6 +126,7 @@ local function readHeader(baseAddress, field)
     })
 
     if not fields then
+        rec("null", { ADDR = "NULL/INVALID", ERR = "proto_header_read_failed: " .. tostring(readErr) })
         return nil, readErr
     end
 
@@ -99,20 +135,29 @@ local function readHeader(baseAddress, field)
     local capacity = fields[3] and fields[3].value
 
     if arrayPtr == nil or size == nil or capacity == nil then
+        rec("null", { ADDR = "NULL/INVALID", ERR = "nil_header_field" })
         return nil, "header_read_failed"
     end
 
+    rec("readHeader", { ADDR = ptr, PTR = arrayPtr, SIZE = size, CAPACITY = capacity })
+
     if size < 0 or capacity < 0 then
+        rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+            ERR = "header_negative_size_or_capacity" })
         return nil, "header_negative_size_or_capacity"
     end
 
     if size > MAX_TRUSTED_ELEMENT_COUNT or capacity > MAX_TRUSTED_ELEMENT_COUNT then
+        rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+            ERR = "header_size_out_of_bounds" })
         return nil, string.format(
             "header_size_out_of_bounds (size=%d capacity=%d, max=%d)",
             size, capacity, MAX_TRUSTED_ELEMENT_COUNT)
     end
 
     if size > capacity then
+        rec("null", { ADDR = ptr, SIZE = size, CAPACITY = capacity,
+            ERR = "header_size_exceeds_capacity" })
         return nil, string.format("header_size_exceeds_capacity (size=%d capacity=%d)", size, capacity)
     end
 
@@ -134,8 +179,10 @@ local function shadowString(field, stringDirect)
     return field
 end
 
-function M.get(baseAddress, field, preReadHeader)
-    log(string.format("[get] base=0x%X type=%s elementType=%s stride=0x%X container=%s", baseAddress, tostring(field.type), tostring(field.elementType), field.elementStride or 0x8, tostring(field.container)))
+function M.get(baseAddress, field, preReadHeader, pathLabel)
+    rec("get", { FIELD = pathLabel or field.name, BASE = baseAddress, OFF = field.offset,
+        TYPE = tostring(field.type), ELEM_TYPE = field.elementType,
+        STRIDE = field.elementStride or 0x8, CONT = tostring(field.container) })
     local header = preReadHeader
     if not header then
         local err
@@ -153,7 +200,6 @@ function M.get(baseAddress, field, preReadHeader)
         return nil, "null_array_ptr"
     end
 
-    log(string.format("[get] elements path: size=%d stride=0x%X arrayPtr=0x%X", header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elements then
         local Struct = loadModule("core/Struct.lua")
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -161,10 +207,14 @@ if field.elements then
 
         if stride > DEFAULT_STRIDE then
             for i = 1, header.size do
+                local elemAddr = header.arrayPtr + (i - 1) * stride
+                rec("elem", { FIELD = field.name, IDX = i - 1, ELEM = elemAddr,
+                    NESTED = elemAddr, ELEM_TYPE = "struct", STRIDE = stride })
                 values[i] = Struct.get(
-                    header.arrayPtr + (i - 1) * stride,
+                    elemAddr,
                     field.elements,
-                    field.stringDirect
+                    field.stringDirect,
+                    (pathLabel or field.name or "elements") .. "[" .. (i - 1) .. "]"
                 )
             end
         else
@@ -175,17 +225,21 @@ if field.elements then
             for i = 1, header.size do
                 local elementPtr = slots[i] and slots[i].value
                 if elementPtr and elementPtr ~= 0 then
-                    values[i] = Struct.get(elementPtr, field.elements, field.stringDirect)
+                    rec("elem", { FIELD = field.name, IDX = i - 1,
+                        SLOT = header.arrayPtr + (i - 1) * stride,
+                        ELEM = elementPtr, NESTED = elementPtr, ELEM_TYPE = "struct" })
+                    values[i] = Struct.get(elementPtr, field.elements, field.stringDirect,
+                        (pathLabel or field.name or "elements") .. "[" .. (i - 1) .. "]")
                 else
                     values[i] = false
+                    rec("null", { FIELD = field.name, IDX = i - 1,
+                        ADDR = "NULL/INVALID", ERR = "null_element_ptr" })
                 end
             end
         end
-        log(string.format("[get] returning %d values", #values))
 return values, nil
     end
 
-    log(string.format("[get] elementType path: type=%s size=%d stride=0x%X arrayPtr=0x%X", field.elementType, header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elementType then
         local elementType = field.elementType
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -208,10 +262,14 @@ if field.elementType then
                     local f = { offset = 0, type = elementType }
                     if field.enum then f.enum = field.enum end
                     f = shadowString(f, field.stringDirect)
-                    log(string.format("[get] ptr element[%d] ptr=0x%X type=%s", i-1, elementPtr, elementType))
-values[i] = impl.get(elementPtr, f)
+                    values[i] = impl.get(elementPtr, f)
+                    rec("elem", { FIELD = field.name, IDX = i - 1,
+                        SLOT = header.arrayPtr + (i - 1) * stride,
+                        ELEM = elementPtr, TYPE = elementType, VALUE = values[i] })
                 else
                     values[i] = false
+                    rec("null", { FIELD = field.name, IDX = i - 1,
+                        ADDR = "NULL/INVALID", ERR = "null_element_ptr" })
                 end
             end
         elseif elementType == "String" and stride == DEFAULT_STRIDE then
@@ -223,10 +281,14 @@ values[i] = impl.get(elementPtr, f)
                 local elementPtr = slots[i] and slots[i].value
                 if elementPtr and elementPtr ~= 0 then
                     local f = { offset = 0, type = "String", indirect = false }
-                    log(string.format("[get] str slot[%d] slotAddr=0x%X elementPtr=0x%X", i-1, header.arrayPtr + (i-1)*DEFAULT_STRIDE, elementPtr))
                     values[i] = impl.get(elementPtr, f)
+                    rec("elem", { FIELD = field.name, IDX = i - 1,
+                        SLOT = header.arrayPtr + (i - 1) * DEFAULT_STRIDE,
+                        ELEM = elementPtr, TYPE = "String", VALUE = values[i] })
                 else
                     values[i] = false
+                    rec("null", { FIELD = field.name, IDX = i - 1,
+                        ADDR = "NULL/INVALID", ERR = "null_element_ptr" })
                 end
             end
         else
@@ -241,12 +303,13 @@ values[i] = impl.get(elementPtr, f)
                 else
                     f = shadowString(f, field.stringDirect)
                 end
-                log(string.format("[get] inline element[%d] offset=0x%X type=%s", i-1, (i-1)*(field.elementStride or 0x8), elementType))
 values[i] = impl.get(header.arrayPtr, f)
+                rec("elem", { FIELD = field.name, IDX = i - 1,
+                    ELEM = header.arrayPtr + (i - 1) * stride,
+                    OFF = (i - 1) * stride, TYPE = elementType, VALUE = values[i] })
             end
         end
 
-        log(string.format("[get] returning %d values", #values))
 return values, nil
     end
 
@@ -325,7 +388,6 @@ return values, nil
         end
     end
 
-    log(string.format("[get] returning %d values", #values))
 return values, nil
 end
 
@@ -346,10 +408,16 @@ function M.set(baseAddress, field, values, preReadHeader)
     local newSize = #values
     local stride = field.elementStride or DEFAULT_STRIDE
 
+    -- Vectors CAN grow past capacity: build a replacement buffer
+    -- in ZeroPage, copy the old elements over, and swap
+    -- begin/end/capEnd in ONE batch after the new elements are in
+    -- place (pendingVectorSwap). Until that swap lands the vector
+    -- still points at its old (fully consistent) buffer, so the
+    -- game never observes a half-grown header. The old buffer is
+    -- abandoned — a game-side leak, acceptable for a memory mod.
+    local pendingVectorSwap = nil
+    local pendingVectorFree = nil
     if newSize > header.capacity then
-        if field.container == "vector" then
-            return false, "capacity_exceeded"
-        end
         local allocSize = newSize * stride
         if allocSize < 8 then allocSize = 8 end
         local newArrayPtr = ZeroPage.allocate(allocSize)
@@ -363,12 +431,28 @@ function M.set(baseAddress, field, values, preReadHeader)
                 return false, "copy_region_failed"
             end
         end
-        local ptrOk = Memory.write(header.containerPtr, Memory.FLAGS.INT64, newArrayPtr)
-        if not ptrOk then
-            return false, "container_ptr_write_failed"
+        local oldArrayPtr = header.arrayPtr
+        if field.container == "vector" then
+            header.arrayPtr = newArrayPtr
+            header.capacity = newSize
+            pendingVectorSwap = newArrayPtr
+            -- Reclaim Nebula's OWN old buffer (a previous ZeroPage
+            -- grow). Game-owned buffers leak on purpose — the game
+            -- manages that heap, we don't.
+            if ZeroPage.owns(oldArrayPtr) then
+                pendingVectorFree = oldArrayPtr
+            end
+        else
+            local ptrOk = Memory.write(header.containerPtr, Memory.FLAGS.INT64, newArrayPtr)
+            if not ptrOk then
+                return false, "container_ptr_write_failed"
+            end
+            header.arrayPtr = newArrayPtr
+            header.capacity = newSize
+            if ZeroPage.owns(oldArrayPtr) then
+                ZeroPage.free(oldArrayPtr)
+            end
         end
-        header.arrayPtr = newArrayPtr
-        header.capacity = newSize
     end
 
     if header.arrayPtr == 0 and newSize == 0 then
@@ -379,7 +463,6 @@ function M.set(baseAddress, field, values, preReadHeader)
         return false, "null_array_ptr"
     end
 
-    log(string.format("[get] elements path: size=%d stride=0x%X arrayPtr=0x%X", header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elements then
         local Struct = loadModule("core/Struct.lua")
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -431,12 +514,38 @@ if field.elements then
                 { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize },
                 { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize },
             })
+        else
+            -- Vector ABI parity fix: get() derives size from
+            -- (end - begin)/stride, so set() must move the end
+            -- pointer to match the size it wrote — otherwise the
+            -- game's begin/end iteration still sees the old size
+            -- after a rewrite or an in-capacity append. When the
+            -- set GREW past capacity, begin and capEnd swap in
+            -- the same batch so the whole header lands atomically.
+            local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+            if pendingVectorSwap then
+                local swapOk = Memory.writeBatch({
+                    { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap },
+                    { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd },
+                    { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd },
+                })
+                if not swapOk then
+                    return false, "vector_header_swap_failed"
+                end
+                if pendingVectorFree then
+                    ZeroPage.free(pendingVectorFree)
+                    pendingVectorFree = nil
+                end
+            else
+                if not Memory.write(header.containerPtr + 0x8, Memory.FLAGS.INT64, newEnd) then
+                    return false, "vector_end_write_failed"
+                end
+            end
         end
 
         return true, nil
     end
 
-    log(string.format("[get] elementType path: type=%s size=%d stride=0x%X arrayPtr=0x%X", field.elementType, header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elementType then
         local elementType = field.elementType
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -540,6 +649,33 @@ if field.elementType then
                 { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize },
                 { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize },
             })
+        else
+            -- Vector ABI parity fix: get() derives size from
+            -- (end - begin)/stride, so set() must move the end
+            -- pointer to match the size it wrote — otherwise the
+            -- game's begin/end iteration still sees the old size
+            -- after a rewrite or an in-capacity append. When the
+            -- set GREW past capacity, begin and capEnd swap in
+            -- the same batch so the whole header lands atomically.
+            local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+            if pendingVectorSwap then
+                local swapOk = Memory.writeBatch({
+                    { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap },
+                    { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd },
+                    { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd },
+                })
+                if not swapOk then
+                    return false, "vector_header_swap_failed"
+                end
+                if pendingVectorFree then
+                    ZeroPage.free(pendingVectorFree)
+                    pendingVectorFree = nil
+                end
+            else
+                if not Memory.write(header.containerPtr + 0x8, Memory.FLAGS.INT64, newEnd) then
+                    return false, "vector_end_write_failed"
+                end
+            end
         end
 
         return true, nil
@@ -581,6 +717,29 @@ if field.elementType then
             { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize },
             { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize },
         })
+    else
+        -- Vector ABI parity fix: keep end == begin + size*stride so
+        -- the game's begin/end iteration sees exactly newSize elements.
+        -- Capacity-growing sets swap begin/capEnd in the same batch.
+        local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+        if pendingVectorSwap then
+            local swapOk = Memory.writeBatch({
+                { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap },
+                { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd },
+                { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd },
+            })
+            if not swapOk then
+                return false, "vector_header_swap_failed"
+            end
+            if pendingVectorFree then
+                ZeroPage.free(pendingVectorFree)
+                pendingVectorFree = nil
+            end
+        else
+            if not Memory.write(header.containerPtr + 0x8, Memory.FLAGS.INT64, newEnd) then
+                return false, "vector_end_write_failed"
+            end
+        end
     end
 
     return true, nil
@@ -598,10 +757,11 @@ function M.setWithHeader(baseAddress, field, values, header, writes)
     local newSize = #values
     local stride = field.elementStride or DEFAULT_STRIDE
 
+    -- Vector grow (see M.set): replacement buffer via ZeroPage;
+    -- begin/end/capEnd swap in the final batch (pendingVectorSwap).
+    local pendingVectorSwap = nil
+    local pendingVectorFree = nil
     if newSize > header.capacity then
-        if field.container == "vector" then
-            return false
-        end
         local allocSize = newSize * stride
         if allocSize < 8 then allocSize = 8 end
         local newArrayPtr = ZeroPage.allocate(allocSize)
@@ -613,9 +773,22 @@ function M.setWithHeader(baseAddress, field, values, header, writes)
             local copyOk = Memory.copyRegion(header.arrayPtr, newArrayPtr, copySize)
             if not copyOk then return false end
         end
-        writes[#writes + 1] = { address = header.containerPtr, flags = Memory.FLAGS.INT64, value = newArrayPtr }
-        header.arrayPtr = newArrayPtr
-        header.capacity = newSize
+        local oldArrayPtr = header.arrayPtr
+        if field.container == "vector" then
+            header.arrayPtr = newArrayPtr
+            header.capacity = newSize
+            pendingVectorSwap = newArrayPtr
+            if ZeroPage.owns(oldArrayPtr) then
+                pendingVectorFree = oldArrayPtr
+            end
+        else
+            writes[#writes + 1] = { address = header.containerPtr, flags = Memory.FLAGS.INT64, value = newArrayPtr }
+            header.arrayPtr = newArrayPtr
+            header.capacity = newSize
+            if ZeroPage.owns(oldArrayPtr) then
+                ZeroPage.free(oldArrayPtr)
+            end
+        end
     end
 
     if header.arrayPtr == 0 and newSize == 0 then
@@ -626,7 +799,6 @@ function M.setWithHeader(baseAddress, field, values, header, writes)
         return false
     end
 
-    log(string.format("[get] elements path: size=%d stride=0x%X arrayPtr=0x%X", header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elements then
         local Struct = loadModule("core/Struct.lua")
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -669,11 +841,27 @@ if field.elements then
         if field.container ~= "vector" then
             writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize }
             writes[#writes + 1] = { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize }
+        else
+            -- Vector ABI parity fix (batched variant): keep end ==
+            -- begin + size*stride in the same batch as the elements.
+            -- Capacity-growing sets swap begin/capEnd in this same
+            -- batch, so the whole header lands atomically.
+            local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+            if pendingVectorSwap then
+                writes[#writes + 1] = { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap }
+                writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+                writes[#writes + 1] = { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd }
+                if pendingVectorFree then
+                    ZeroPage.free(pendingVectorFree)
+                    pendingVectorFree = nil
+                end
+            else
+                writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+            end
         end
         return true
     end
 
-    log(string.format("[get] elementType path: type=%s size=%d stride=0x%X arrayPtr=0x%X", field.elementType, header.size, field.elementStride or 0x8, header.arrayPtr or 0))
 if field.elementType then
         local elementType = field.elementType
         local stride = field.elementStride or DEFAULT_STRIDE
@@ -743,6 +931,23 @@ if field.elementType then
         if field.container ~= "vector" then
             writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize }
             writes[#writes + 1] = { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize }
+        else
+            -- Vector ABI parity fix (batched variant): keep end ==
+            -- begin + size*stride in the same batch as the elements.
+            -- Capacity-growing sets swap begin/capEnd in this same
+            -- batch, so the whole header lands atomically.
+            local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+            if pendingVectorSwap then
+                writes[#writes + 1] = { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap }
+                writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+                writes[#writes + 1] = { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd }
+                if pendingVectorFree then
+                    ZeroPage.free(pendingVectorFree)
+                    pendingVectorFree = nil
+                end
+            else
+                writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+            end
         end
         return true
     end
@@ -769,6 +974,22 @@ if field.elementType then
     if field.container ~= "vector" then
         writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT32, value = newSize }
         writes[#writes + 1] = { address = header.containerPtr + 0xC, flags = Memory.FLAGS.INT32, value = newSize }
+    else
+        -- Vector ABI parity fix (batched variant): keep end ==
+        -- begin + size*stride in the same batch as the elements.
+        -- Capacity-growing sets swap begin/capEnd in this same batch.
+        local newEnd = header.arrayPtr + newSize * (field.elementStride or 0x8)
+        if pendingVectorSwap then
+            writes[#writes + 1] = { address = header.containerPtr + 0x0, flags = Memory.FLAGS.INT64, value = pendingVectorSwap }
+            writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+            writes[#writes + 1] = { address = header.containerPtr + 0x10, flags = Memory.FLAGS.INT64, value = newEnd }
+            if pendingVectorFree then
+                ZeroPage.free(pendingVectorFree)
+                pendingVectorFree = nil
+            end
+        else
+            writes[#writes + 1] = { address = header.containerPtr + 0x8, flags = Memory.FLAGS.INT64, value = newEnd }
+        end
     end
     return true
 end

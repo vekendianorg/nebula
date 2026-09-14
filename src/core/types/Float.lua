@@ -1,54 +1,41 @@
 --==================================================
 -- core/types/Float.lua
 --==================================================
--- 4-byte IEEE-754 float field.
 
 local Memory = loadModule("core/Memory.lua")
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.Float]", ...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[Float]", ...)
     end
 end
 
-
-
----@param baseAddress integer
----@param field table
----@return number|nil value, string|nil error
 function M.get(baseAddress, field)
-    function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) == "number" then
-        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.FLOAT, value = value }
-    end
+    return Memory.read(baseAddress + field.offset, Memory.FLAGS.FLOAT)
 end
 
-return Memory.read(baseAddress + field.offset, Memory.FLAGS.FLOAT)
-end
-
----@param baseAddress integer
----@param field table
----@param value number
----@return boolean ok
 function M.set(baseAddress, field, value)
     if type(value) ~= "number" then
+        log(string.format("[set] REJECTED at 0x%X offset=0x%X: non-number value (%s)",
+            baseAddress, field.offset, type(value)))
         return false
     end
-    function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) == "number" then
-        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.FLOAT, value = value }
-    end
-end
-
-return Memory.write(baseAddress + field.offset, Memory.FLAGS.FLOAT, value)
+    return Memory.write(baseAddress + field.offset, Memory.FLAGS.FLOAT, value)
 end
 
 function M.collectWrite(baseAddress, field, value, writes)
-    if type(value) == "number" then
-        writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.FLOAT, value = value }
+    -- true/false contract — see Int32.collectWrite for why nil broke set().
+    if type(value) ~= "number" then
+        log(string.format("[set] collectWrite REJECTED at 0x%X offset=0x%X: non-number value (%s)",
+            baseAddress, field.offset, type(value)))
+        return false
     end
+    writes[#writes + 1] = { address = baseAddress + field.offset, flags = Memory.FLAGS.FLOAT, value = value }
+    return true
 end
 
 return M

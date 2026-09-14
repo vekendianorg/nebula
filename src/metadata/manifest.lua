@@ -21,9 +21,7 @@
 --
 -- Versioning rules (finalized):
 --   - Nebula is 64-bit only. There is no architecture-specific
---     branch here, unlike Void's resolver (see
---     how-to-get-game-version.lua) which keys its chain on
---     DEVICE_ARCH — that concern doesn't apply to Nebula.
+--     branch here.
 --   - Metadata versions use the first two HCR2 version components
 --     ("1.73", "1.74", ...). A running game version such as
 --     "1.74.2" resolves against the "1.74" metadata folder; the
@@ -39,7 +37,7 @@ local M = {}
 
 -- Ascending list of known "MAJOR.MINOR" metadata version folders
 -- under metadata/<version>/.
-local VERSIONS = { "1.73" }
+local VERSIONS = { "1.73", "1.74" }
 
 M.VERSIONS = VERSIONS
 
@@ -96,7 +94,14 @@ end
 ---@param gameVersion string @ "MAJOR.MINOR"
 ---@return string|nil version, string|nil error
 function M.resolveVersion(gameVersion)
-    if #VERSIONS == 0 then
+    -- Consult the exported M.VERSIONS, not the captured upvalue:
+    -- M.VERSIONS is the module's documented, tested surface (the
+    -- spec swaps it to exercise multi-version resolution), and a
+    -- consumer may register additional version folders at runtime.
+    -- An explicitly emptied M.VERSIONS means "no versions known"
+    -- and must fail; only a nil (never-set) falls back.
+    local versions = M.VERSIONS or VERSIONS
+    if #versions == 0 then
         return nil, "no_versions_registered"
     end
 
@@ -105,10 +110,10 @@ function M.resolveVersion(gameVersion)
         return nil, "unparseable_game_version: " .. tostring(gameVersion)
     end
 
-    -- VERSIONS is ascending, so the last one that is <= the game
+    -- versions is ascending, so the last one that is <= the game
     -- version is the closest applicable one.
     local best = nil
-    for _, v in ipairs(VERSIONS) do
+    for _, v in ipairs(versions) do
         local vt = parseTwoComponent(v)
         if vt and cmp(vt, gv) <= 0 then
             best = v
@@ -116,7 +121,7 @@ function M.resolveVersion(gameVersion)
     end
 
     if not best then
-        best = VERSIONS[1] -- game is older than every known snapshot; use the oldest
+        best = versions[1] -- game is older than every known snapshot; use the oldest
     end
 
     return best, nil
@@ -162,7 +167,7 @@ end
 
 -- Alias: every metadata/<version>/structs/*.lua file that pulls in
 -- a shared element template calls Manifest.load("SomeStruct") (see
--- e.g. metadata/1.73/structs/GameStatus.lua), and api/GameStatus.lua
+-- e.g. metadata/1.73/structs/GameStatus.lua), and api/PlayerInfo.lua
 -- calls Manifest.load("GameStatus") expecting the same
 -- (metadata, version) return shape as M.resolve. Same function,
 -- just the name every caller already uses.

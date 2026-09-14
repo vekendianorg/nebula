@@ -17,6 +17,8 @@
 -- fully mapped from the dump.
 
 local Manifest = loadModule("metadata/manifest.lua")
+local FixedTuningPartDefinition = Manifest.load("FixedTuningPartDefinition")
+local PriceCurveDefinition      = Manifest.load("PriceCurveDefinition")
 
 return {
     ["id"] = {
@@ -49,8 +51,14 @@ return {
         -- PriceCurveDefinition.cost is an inline CurrencyAmount
         -- (currency@0x0, amount@0x18); priceCurve is List<int>
         -- (inline std::vector<int>).
-        ["currency"] = { offset = 0x60, type = "String" },
-        ["amount"] = { offset = 0x78, type = "Int32" },
+        ["currency"] = {
+            offset = 0x60,
+            type = "String"
+        },
+        ["amount"] = {
+            offset = 0x78,
+            type = "Int32"
+        },
         ["priceCurve"] = {
             offset = 0x80,
             type = "Array",
@@ -66,7 +74,7 @@ return {
         offset = 0x98,
         type = "Array",
         elementStride = 0x28,
-        elements = Manifest.load("FixedTuningPartDefinition")
+        elements = FixedTuningPartDefinition
     },
     ["availableTuningParts"] = {
         -- dump: List<FixedTuningPartDefinition> // 0xb0, same
@@ -74,7 +82,7 @@ return {
         offset = 0xB0,
         type = "Array",
         elementStride = 0x28,
-        elements = Manifest.load("FixedTuningPartDefinition")
+        elements = FixedTuningPartDefinition
     },
     ["tuningPartUpgradePriceCurves"] = {
         -- dump: List<PriceCurveDefinition> // 0xc8, INLINE elements
@@ -83,16 +91,25 @@ return {
         offset = 0xC8,
         type = "Array",
         elementStride = 0x38,
-        elements = Manifest.load("PriceCurveDefinition")
+        elements = PriceCurveDefinition
     },
     ["rent"] = {
         -- dump: RentDefinition // 0xe8, INLINE member (next field
         -- eventPointsToUnlock@0x110 -> gap 0x28 = sizeof
         -- (RentDefinition)). cost is an inline CurrencyAmount
         -- (currency@0x0, amount@0x18); duration int @0x20.
-        ["currency"] = { offset = 0xE8, type = "String" },
-        ["amount"] = { offset = 0x100, type = "Int32" },
-        ["duration"] = { offset = 0x120, type = "Int32" },
+        ["currency"] = {
+            offset = 0xE8,
+            type = "String"
+        },
+        ["amount"] = {
+            offset = 0x100,
+            type = "Int32"
+        },
+        ["duration"] = {
+            offset = 0x120,
+            type = "Int32"
+        },
     },
     ["levelUpsPerPurchase"] = {
         offset = 0xE0,

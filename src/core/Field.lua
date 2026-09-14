@@ -46,8 +46,17 @@
 local Type     = loadModule("core/Type.lua")
 local Repeated = loadModule("core/Repeated.lua")
 local Memory   = loadModule("core/Memory.lua")
+local Struct   = loadModule("core/Struct.lua")
 
 local Field = {}
+
+local Logfile = loadModule("core/Logfile.lua")
+
+local function log(...)
+    if Nebula ~= nil and Nebula.log then
+        Logfile.log("[Field]", ...)
+    end
+end
 
 --==================================================
 -- Shared helpers
@@ -63,6 +72,19 @@ end
 ---Offset is known (not the 0xBAAD placeholder).
 local function isOffsetKnown(field)
     return field.offset ~= nil and field.offset ~= 0xBAAD
+end
+
+local function objectChildTemplate(field)
+    if type(field) ~= "table" then return nil end
+    if type(field.elements) == "table" then
+        return field.elements
+    end
+    for _, v in pairs(field) do
+        if type(v) == "table" and type(v.offset) == "number" then
+            return field
+        end
+    end
+    return nil
 end
 
 ---Shadow a String field with indirect=false when opts.stringDirect
@@ -120,13 +142,34 @@ end
 ---@return any|nil value, string|nil error
 local function readFieldGeneric(base, metadata, opts, id)
     local field, err = lookupInMetadata(metadata, id)
-    if not field then return nil, err end
+    if not field then
+        log(string.format("[get] '%s': lookup FAILED (%s)", tostring(id), tostring(err)))
+        return nil, err
+    end
+
+    log(string.format("[get] '%s' resolved: type=%s offset=0x%X base=0x%X%s%s",
+        tostring(id), tostring(field.type), field.offset or 0, base,
+        field.repeated == true and " repeated=true" or "",
+        (field.type == "Array" and not (field.elements or field.elementType)) and " (NO elements/elementType — unreadable)" or ""))
 
     if field.type == "Object" then
-        return nil, "unsupported_type: Object fields are not yet readable (missing nested metadata)"
+        local template = objectChildTemplate(field)
+        if not template then
+            log(string.format("[get] '%s': Object fields are not readable — missing nested metadata", tostring(id)))
+            return nil, "unsupported_type: Object fields are not yet readable (missing nested metadata)"
+        end
+        if not isOffsetKnown(field) then
+            return nil, "offset_unknown: " .. id
+        end
+        local ptr = Memory.deref(base, field.offset)
+        if not ptr or ptr == 0 then
+            return nil, "null_pointer: " .. id
+        end
+        return Struct.get(ptr, template, opts.stringDirect, tostring(id))
     end
 
     if not isOffsetKnown(field) then
+        log(string.format("[get] '%s': offset_unknown (0x%X placeholder)", tostring(id), field.offset or 0))
         return nil, "offset_unknown: " .. id
     end
 
@@ -140,6 +183,7 @@ local function readFieldGeneric(base, metadata, opts, id)
 
     local impl = Type.resolve(field.type)
     if not impl then
+        log(string.format("[get] '%s': no_type_impl '%s'", tostring(id), tostring(field.type)))
         return nil, "no_type_impl: " .. tostring(field.type)
     end
 
@@ -155,13 +199,32 @@ end
 ---@return boolean ok, string|nil error
 local function writeFieldGeneric(base, metadata, opts, id, value)
     local field, err = lookupInMetadata(metadata, id)
-    if not field then return false, err end
+    if not field then
+        log(string.format("[set] '%s': lookup FAILED (%s)", tostring(id), tostring(err)))
+        return false, err
+    end
+
+    log(string.format("[set] '%s' resolved: type=%s offset=0x%X base=0x%X",
+        tostring(id), tostring(field.type), field.offset or 0, base))
 
     if field.type == "Object" then
-        return false, "unsupported_type: Object fields are not yet writable (missing nested metadata)"
+        local template = objectChildTemplate(field)
+        if not template then
+            log(string.format("[set] '%s': Object fields are not writable — missing nested metadata", tostring(id)))
+            return false, "unsupported_type: Object fields are not yet writable (missing nested metadata)"
+        end
+        if not isOffsetKnown(field) then
+            return false, "offset_unknown: " .. id
+        end
+        local ptr = Memory.deref(base, field.offset)
+        if not ptr or ptr == 0 then
+            return false, "null_pointer: " .. id
+        end
+        return Struct.set(ptr, template, value, opts.stringDirect)
     end
 
     if not isOffsetKnown(field) then
+        log(string.format("[set] '%s': offset_unknown (0x%X placeholder)", tostring(id), field.offset or 0))
         return false, "offset_unknown: " .. id
     end
 
@@ -318,6 +381,11 @@ function Field.message(base, metadata, opts, resolveFn)
     local function ensureBase()
         if self._base == nil and resolveFn then
             self._base, self._resolveErr = resolveFn()
+            if self._base then
+                log(string.format("base resolved: 0x%X", self._base))
+            else
+                log(string.format("base resolution FAILED: %s", tostring(self._resolveErr)))
+            end
         end
         return self._base ~= nil
     end
@@ -405,7 +473,9 @@ function Field.message(base, metadata, opts, resolveFn)
                     if not ptr or ptr == 0 then
                         return nil, derefErr or "null_pointer"
                     end
-                    return Field.message(ptr, node, opts, nil)
+                    log(string.format("navigating into Object '%s': base=0x%X offset=0x%X -> ptr=0x%X",
+                        tostring(k), self._base, node.offset or 0, ptr))
+                    return Field.message(ptr, objectChildTemplate(node), opts, nil)
                 elseif node.type == "Array" then
                     return Field.array(self._base, node, opts)
                 elseif node.repeated then

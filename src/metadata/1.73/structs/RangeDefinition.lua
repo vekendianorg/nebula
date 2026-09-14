@@ -12,6 +12,12 @@
 --       public int rangeMax; // 0x4
 
 return {
-    ["rangeMin"] = { offset = 0x0, type = "Int32" },
-    ["rangeMax"] = { offset = 0x4, type = "Int32" },
+    ["rangeMin"] = {
+        offset = 0x0,
+        type = "Int32"
+    },
+    ["rangeMax"] = {
+        offset = 0x4,
+        type = "Int32"
+    },
 }

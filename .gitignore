@@ -1,12 +1,8 @@
 # temp/ — scratch analysis, struct dumps, and validation scratch files
 # (libcocos2dcpp.cs, lua_struct_check.ps1, _bodies*.txt, etc.).
 # Never commit these; they are regenerated locally.
-<<<<<<< HEAD
-temp/
-=======
 temp/
 # Packed bundles are committed only under build/. Root-level byproducts
 # from local packing/testing runs are never committed.
 /nebula_packed.lua
 /nebula.zip
->>>>>>> main

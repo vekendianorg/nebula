@@ -37,6 +37,7 @@
 
 
 local Manifest = loadModule("metadata/manifest.lua")
+local RangeDefinition = Manifest.load("RangeDefinition")
 return {
     ["chestImageClosed"] = {
         offset = 0x0,
@@ -91,7 +92,12 @@ return {
         offset = 0xC0,
         type = "Array",
         elements = {
-            ["items"] = { offset = 0x18, type = "Array", elementType = "Int32", elementStride = 0x4 }
+            ["items"] = {
+                offset = 0x18,
+                type = "Array",
+                elementType = "Int32",
+                elementStride = 0x4
+            }
         }
     },
     ["customizationsRarityWeights"] = {
@@ -104,7 +110,12 @@ return {
         offset = 0xF0,
         type = "Array",
         elements = {
-            ["items"] = { offset = 0x18, type = "Array", elementType = "Int32", elementStride = 0x4 }
+            ["items"] = {
+                offset = 0x18,
+                type = "Array",
+                elementType = "Int32",
+                elementStride = 0x4
+            }
         }
     },
     ["tuningPartsRarityWeights"] = {
@@ -119,7 +130,7 @@ return {
         offset = 0x120,
         type = "Array",
         elementStride = 0x8,
-        elements = Manifest.load("RangeDefinition")
+        elements = RangeDefinition
     },
     ["tuningPartsBlacklist"] = {
         offset = 0x138,

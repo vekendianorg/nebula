@@ -14,7 +14,17 @@
 --       public int32 rarity_; // 0x20
 
 return {
-    ["x"] = { offset = 0x18, type = "Float" },
-    ["y"] = { offset = 0x1C, type = "Float" },
-    ["rarity"] = { offset = 0x20, type = "Int32" },
+    ["x"] = {
+        offset = 0x18,
+        type = "Float"
+    },
+    ["y"] = {
+        offset = 0x1C,
+        type = "Float"
+    },
+    ["rarity"] = {
+        offset = 0x20,
+        type = "Enum",
+        enum = "Rarity"
+    },
 }

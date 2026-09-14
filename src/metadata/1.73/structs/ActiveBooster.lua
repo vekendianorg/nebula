@@ -1,3 +1,4 @@
+--==================================================
 -- metadata/1.73/ActiveBooster.lua
 --==================================================
 -- ActiveBooster (dump Size 0x28, exact):
@@ -7,7 +8,16 @@
 -- RepeatedPtrField<ActiveBooster> arrays (POINTER-slot elements,
 -- default stride).
 return {
-    ["boosterId"] = { offset = 0x18, type = "String" },
-    ["endTimestamp"] = { offset = 0x20, type = "Int32" },
-    ["cumulativeAmount"] = { offset = 0x24, type = "Float" },
+    ["boosterId"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["endTimestamp"] = {
+        offset = 0x20,
+        type = "Int32"
+    },
+    ["cumulativeAmount"] = {
+        offset = 0x24,
+        type = "Float"
+    },
 }
