@@ -18,6 +18,7 @@
     --text-muted: #5D6675;
     --border: #1E232E;
     --border-strong: #2A3140;
+    --nav-h: 56px;
     --radius: 8px;
     --font-sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
@@ -58,7 +59,7 @@ body.locked { overflow: hidden; }
     top: 0; left: 0; right: 0;
     z-index: 200;
     padding: 0 2rem;
-    height: 56px;
+    height: var(--nav-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -287,17 +288,17 @@ body.locked { overflow: hidden; }
     gap: 3rem;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 6.5rem 2rem 4rem;
+    padding: calc(var(--nav-h) + 2.5rem) 2rem 4rem;
     width: 100%;
     align-items: flex-start;
 }
 
 .doc-sidebar {
     position: sticky;
-    top: 6.5rem;
+    top: calc(var(--nav-h) + 1rem);
     width: 250px;
     flex-shrink: 0;
-    max-height: calc(100vh - 8rem);
+    max-height: calc(100vh - var(--nav-h) - 3rem);
     overflow-y: auto;
     border-right: 1px solid var(--border);
     padding-right: 1.25rem;
@@ -394,10 +395,18 @@ body.locked { overflow: hidden; }
     color: var(--text-secondary);
 }
 
+.table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    margin: 1.25rem 0;
+}
+
 .doc-content table {
     width: 100%;
+    min-width: max-content;
     border-collapse: collapse;
-    margin: 1.25rem 0;
+    margin: 0;
     font-size: 0.85rem;
 }
 
@@ -471,6 +480,8 @@ body.locked { overflow: hidden; }
     background: var(--bg-code);
     padding: 1rem 1.1rem;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     line-height: 1.65;
@@ -521,7 +532,7 @@ body.locked { overflow: hidden; }
     outline: none;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 0.95rem;
+    font-size: 1rem; /* >=16px: prevents iOS focus auto-zoom */
 }
 
 .search-input::placeholder { color: var(--text-muted); }
@@ -579,7 +590,7 @@ body.locked { overflow: hidden; }
 .narrow-layout {
     max-width: 860px;
     margin: 0 auto;
-    padding: 6.5rem 2rem 4rem;
+    padding: calc(var(--nav-h) + 2.5rem) 2rem 4rem;
     width: 100%;
 }
 
@@ -653,18 +664,41 @@ body.locked { overflow: hidden; }
 
 /* ================= Responsive ================= */
 
+/* ================= Tablet ================= */
+
 @media (max-width: 1024px) {
     .doc-layout { gap: 2rem; }
     .doc-sidebar { width: 210px; }
 }
 
-@media (max-width: 860px) {
-    .nav { padding: 0 1.1rem; }
+/* ================= Phone ================= */
 
+@media (max-width: 860px) {
+    :root { --nav-h: 52px; }
+
+    body { font-size: 15.5px; }
+
+    .nav { padding: 0 1rem; padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
     .kbd-hint { display: none; }
     .nav-search-btn span { display: none; }
+    /* comfortable tap target for the search button */
+    .nav-search-btn { padding: 0.5rem; margin: -0.5rem; }
+    .nav-links { gap: 0.4rem; }
+    .nav-links a, .nav-links button { font-size: 0.9rem; padding: 0.75rem 0.6rem; }
+    .nav-links .gh-icon a, a.gh-icon { padding: 0.75rem 0.6rem; margin: -0.2rem; }
 
-    .doc-layout { flex-direction: column; padding-top: 5.5rem; gap: 0; }
+    .footer { padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom)); }
+
+    /* --- hero --- */
+    .hero { padding: 4.5rem 1.1rem 3rem; }
+    .hero-subtitle { font-size: 0.95rem; }
+    .hero-code { width: 100%; margin-top: 2.25rem; }
+    .hl { font-size: 0.72rem; padding: 0.85rem 0.95rem; }
+    .feature-grid { width: 100%; grid-template-columns: 1fr; margin-top: 2.25rem; gap: 0.6rem; }
+    .hero-footer { padding: 0 1.25rem 1.25rem; }
+
+    /* --- docs: sidebar collapses behind a toggle --- */
+    .doc-layout { flex-direction: column; padding-left: 1.1rem; padding-right: 1.1rem; gap: 0; padding-bottom: 3rem; }
 
     .doc-sidebar {
         position: static;
@@ -682,13 +716,13 @@ body.locked { overflow: hidden; }
         align-items: center;
         gap: 0.5rem;
         width: 100%;
-        margin-bottom: 1.5rem;
-        padding: 0.6rem 0.9rem;
+        margin-bottom: 1.25rem;
+        padding: 0.75rem 0.95rem;
         background: var(--bg-raised);
         border: 1px solid var(--border);
         border-radius: var(--radius);
         color: var(--text-secondary);
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         font-family: var(--font-sans);
         cursor: pointer;
     }
@@ -703,5 +737,76 @@ body.locked { overflow: hidden; }
 
     .doc-toc-toggle.open svg { transform: rotate(90deg); }
 
-    .feature-grid { grid-template-columns: 1fr; }
+    .toc-link { padding: 0.45rem 0; font-size: 0.88rem; }
+
+    .doc-content h1 { font-size: 1.55rem; }
+    .doc-content h2 { font-size: 1.25rem; margin-top: 2.25rem; }
+    .doc-content h3 { font-size: 1rem; }
+    .doc-content table { font-size: 0.8rem; }
+    .doc-content th, .doc-content td { padding: 0.45rem 0.6rem; }
+
+    .doc-header h1 { font-size: 1.7rem; }
+
+    /* bigger copy targets on touch */
+    .copy-btn { font-size: 0.78rem; padding: 0.3rem 0.75rem; }
+
+    .narrow-layout { padding-left: 1.1rem; padding-right: 1.1rem; padding-bottom: 3rem; }
+
+    /* --- search: near full-bleed sheet on phones --- */
+    .search-overlay { padding: 4vh 0.75rem 0; }
+    .search-panel { width: 100%; }
+    .search-results { max-height: 55vh; }
+    .search-hint { display: none; }
+}
+
+/* ================= Touch devices: real tap targets ================= */
+
+@media (hover: none) and (pointer: coarse) {
+    .btn { padding: 0.8rem 1.4rem; min-height: 44px; }
+    .nav-links a, .nav-links button { min-height: 44px; display: inline-flex; align-items: center; }
+    .toc-link { padding: 0.5rem 0; }
+    .copy-btn { min-height: 36px; min-width: 64px; }
+    .search-result { padding: 0.85rem 1.1rem; }
+    /* underline grow animation is invisible/impossible on touch — skip it */
+    .nav-links a.nav-link::after { content: none; }
+}
+
+/* ================= Landscape phones (horizontal layout) ================= */
+
+@media (orientation: landscape) and (max-height: 500px) {
+    :root { --nav-h: 46px; }
+
+    body { font-size: 15px; }
+
+    .hero { padding: 2.75rem 1.5rem 2rem; justify-content: flex-start; }
+    .hero-title { font-size: 2rem; }
+    .hero-subtitle { margin-top: 0.75rem; font-size: 0.9rem; }
+    .hero-version { margin-bottom: 0.9rem; }
+    .hero-actions { margin-top: 1.1rem; }
+    .hero-actions .btn { padding: 0.55rem 1.1rem; }
+    .hero-code { margin-top: 1.5rem; width: min(92vw, 560px); }
+    .hl { font-size: 0.68rem; padding: 0.7rem 0.9rem; }
+    .feature-grid {
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: 1.5rem;
+        padding-bottom: 1.5rem;
+        gap: 0.5rem;
+    }
+    .feature-card { padding: 0.75rem 0.9rem; }
+    .hero-footer { padding-bottom: 1rem; }
+
+    .doc-layout { padding-top: calc(var(--nav-h) + 1.5rem); padding-bottom: 2rem; }
+    .doc-header { margin-bottom: 1.5rem; }
+    .doc-content h2 { margin-top: 2rem; }
+    .doc-sidebar { max-height: calc(100vh - var(--nav-h) - 2rem); }
+
+    .search-overlay { padding: 6vh 1rem 0; align-items: flex-start; }
+    .search-results { max-height: 45vh; }
+}
+
+/* ================= Very wide screens ================= */
+
+@media (min-width: 1600px) {
+    .doc-layout { max-width: 1360px; }
+    .doc-content { max-width: 58rem; }
 }

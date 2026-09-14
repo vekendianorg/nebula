@@ -133,6 +133,7 @@
 
     function open() {
         overlay.classList.add('open');
+        document.body.classList.add('locked');   // freeze page scroll behind the modal
         loadIndex().then(function() { render(input.value); });
         setTimeout(function() { input.focus(); input.select(); }, 30);
         document.addEventListener('keydown', onKeydown);
@@ -140,6 +141,7 @@
 
     function close() {
         overlay.classList.remove('open');
+        document.body.classList.remove('locked'); // always paired with open()'s add
         document.removeEventListener('keydown', onKeydown);
     }
 

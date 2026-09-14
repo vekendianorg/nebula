@@ -103,6 +103,18 @@
         wrapper.appendChild(hl);
     });
 
+    /* ================= Tables: horizontal scroll wrapper =================
+     * Markdown tables (type modules, GG flags, etc.) can be wider than
+     * a phone screen. Wrap each one in an overflow-x container so it
+     * scrolls sideways instead of squashing the layout. */
+    document.querySelectorAll('.doc-content table').forEach(function(tbl) {
+        if (tbl.parentNode.classList && tbl.parentNode.classList.contains('table-wrap')) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'table-wrap';
+        tbl.parentNode.insertBefore(wrap, tbl);
+        wrap.appendChild(tbl);
+    });
+
     /* ================= Docs content entrance stagger ================= */
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduced) {
