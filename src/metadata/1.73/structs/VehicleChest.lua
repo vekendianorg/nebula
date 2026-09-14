@@ -19,10 +19,9 @@ return {
         type = "String"
     },
     ["chestIndex"] = {
-        -- dump: int chestIndex // 0x18 (legacy name: chestId). The
-        -- ChestType enum can still be applied, keyed by this index.
         offset = 0x18,
-        type = "Int32"
+        type = "Enum",
+        enum = "ChestType"
     },
     ["targetIndex"] = {
         offset = 0x1C,

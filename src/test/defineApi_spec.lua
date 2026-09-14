@@ -23,7 +23,7 @@
 --     resolution/dispatch is faked.
 --   - The REAL AOB/string-search resolvers in core/Memory.lua
 --     (findPublicEventBases, findTeamEventBases,
---     findCommunityEventBases, resolveGameStatusBase) are NOT
+--     findCommunityEventBases, resolvePlayerInfoBase) are NOT
 --     exercised here, because they call gg.searchNumber/
 --     gg.getRangesList against live process memory, which this
 --     mock does not attempt to emulate. Faking a "successful" AOB
@@ -70,22 +70,33 @@ gg = {
     FILES_DIR = "/tmp",
     REGION_C_ALLOC = 1,
     REGION_OTHER = 2,
+    -- modules must resolve paths from the ENV scriptDir, never
+    -- gg.getFile — a call here fails the spec loudly
+    getFile = function()
+        error("gg.getFile called — use the ENV scriptDir instead")
+    end,
 }
 
 --==================================================
 -- loadModule (same relative-path loader as main.lua, scoped to src/)
 --==================================================
 
+-- Encapsulated loader — the same private-env pattern as main.lua.
+-- The spec drives Nebula the way a host script does: modules live
+-- in a private environment whose reads fall through to the host
+-- globals. scriptDir / loadModule / Nebula are ENVIRONMENT
+-- entries, never _G pollution.
 local scriptDir = (arg and arg[0] and arg[0]:match("(.*/)")) or "./"
 local srcDir = scriptDir .. "../"
+local ENV = setmetatable({ scriptDir = srcDir }, { __index = _G })
 local _moduleCache = {}
 
-function loadModule(name, soft)
-    local path = srcDir .. name
+function ENV.loadModule(name, soft)
+    local path = ENV.scriptDir .. name
     if _moduleCache[path] ~= nil then
         return _moduleCache[path]
     end
-    local chunk, err = loadfile(path)
+    local chunk, err = loadfile(path, "t", ENV)
     if not chunk then
         if soft then return nil, err end
         error("Module load failed: " .. name .. "\n" .. tostring(err))
@@ -100,7 +111,10 @@ function loadModule(name, soft)
     return _moduleCache[path]
 end
 
+local loadModule = ENV.loadModule
+
 Nebula = { log = false, verbose = false }
+ENV.Nebula = Nebula
 
 --==================================================
 -- Tiny assertion helper
@@ -152,9 +166,15 @@ do
     Manifest.VERSIONS = savedVersions
 
     -- end-to-end resolve() through the mocked gg.getTargetInfo()
+    -- 1.74 is registered now (manifest VERSIONS = {"1.73","1.74"}), so
+    -- a 1.74.x game picks 1.74; only a patch beyond BOTH registered
+    -- versions falls back to the newest registered one.
     MOCK_GAME_VERSION = "1.74.9"
     local metadata, version, resolveErr = Manifest.resolve("EventDefinition")
-    check("resolve() picks best-available (1.73) for a newer unregistered patch", version == "1.73", version)
+    check("resolve() picks exact registered 1.74 for a 1.74.x game", version == "1.74", version)
+    MOCK_GAME_VERSION = "1.99.9"
+    local _, fallbackVersion = Manifest.resolve("EventDefinition")
+    check("resolve() picks best-available (1.74) for a newer unregistered patch", fallbackVersion == "1.74", fallbackVersion)
     check("resolve() returns loaded metadata table", type(metadata) == "table", metadata)
     MOCK_GAME_VERSION = nil
 end

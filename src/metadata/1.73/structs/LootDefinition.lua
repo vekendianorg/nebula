@@ -15,6 +15,17 @@
 -- offerDiscountLabel / offerValueMultiplier.
 
 local Manifest = loadModule("metadata/manifest.lua")
+local UnlockablePaint         = Manifest.load("UnlockablePaint")
+local UnlockableSpriteVariant = Manifest.load("UnlockableSpriteVariant")
+local VehicleChest            = Manifest.load("VehicleChest")
+local CurrencyAmount          = Manifest.load("CurrencyAmount")
+local TuningPartLoot          = Manifest.load("TuningPartLoot")
+local HomePropLoot            = Manifest.load("HomePropLoot")
+local CustomChest             = Manifest.load("CustomChest")
+local CustomizationLoot       = Manifest.load("CustomizationLoot")
+local UpgradeLoot             = Manifest.load("UpgradeLoot")
+local VehicleMasteryXpReward  = Manifest.load("VehicleMasteryXpReward")
+local StyleShardReward        = Manifest.load("StyleShardReward")
 
 local M = {
     ["id"] = {
@@ -67,14 +78,14 @@ local M = {
         offset = 0x90,
         type = "Array",
         elementStride = 0x30,
-        elements = Manifest.load("UnlockablePaint")
+        elements = UnlockablePaint
     },
     ["unlockVehicleSpriteVariants"] = {
         -- dump: List<UnlockableSpriteVariant> // 0xa8
         offset = 0xA8,
         type = "Array",
         elementStride = 0x48,
-        elements = Manifest.load("UnlockableSpriteVariant")
+        elements = UnlockableSpriteVariant
     },
     ["unlockAdventureMaps"] = {
         offset = 0xC0,
@@ -101,28 +112,28 @@ local M = {
         offset = 0x108,
         type = "Array",
         elementStride = 0x20,
-        elements = Manifest.load("VehicleChest")
+        elements = VehicleChest
     },
     ["currencies"] = {
         -- dump: List<CurrencyAmount> // 0x120
         offset = 0x120,
         type = "Array",
         elementStride = 0x20,
-        elements = Manifest.load("CurrencyAmount")
+        elements = CurrencyAmount
     },
     ["tuningParts"] = {
         -- dump: List<TuningPartLoot> // 0x150
         offset = 0x150,
         type = "Array",
         elementStride = 0x38,
-        elements = Manifest.load("TuningPartLoot")
+        elements = TuningPartLoot
     },
     ["unlockHomeProps"] = {
         -- dump: List<HomePropLoot> // 0x180
         offset = 0x180,
         type = "Array",
         elementStride = 0x20,
-        elements = Manifest.load("HomePropLoot")
+        elements = HomePropLoot
     },
     ["customChests"] = {
         -- dump: List<CustomChest> // 0x138. NOTE: the legacy inline
@@ -136,7 +147,7 @@ local M = {
         offset = 0x138,
         type = "Array",
         elementStride = 0x150,
-        elements = Manifest.load("CustomChest")
+        elements = CustomChest
     },
     ["unlockHomeBackgrounds"] = {
         -- dump: List<string> // 0x198
@@ -162,7 +173,7 @@ local M = {
         offset = 0x168,
         type = "Array",
         elementStride = 0x50,
-        elements = Manifest.load("CustomizationLoot")
+        elements = CustomizationLoot
     },
     ["boosters"] = {
         -- dump: List<string> // 0x1b0, inline std::string elements
@@ -178,7 +189,7 @@ local M = {
         offset = 0x1C8,
         type = "Array",
         elementStride = 0x50,
-        elements = Manifest.load("UpgradeLoot")
+        elements = UpgradeLoot
     },
     ["vehicleMasteryXp"] = {
         -- dump: List<VehicleMasteryXpReward> // 0x1e0, INLINE
@@ -187,7 +198,7 @@ local M = {
         offset = 0x1E0,
         type = "Array",
         elementStride = 0x20,
-        elements = Manifest.load("VehicleMasteryXpReward")
+        elements = VehicleMasteryXpReward
     },
     ["styleShards"] = {
         -- dump: List<StyleShardReward> // 0x1f8, INLINE elements
@@ -196,7 +207,7 @@ local M = {
         offset = 0x1F8,
         type = "Array",
         elementStride = 0x38,
-        elements = Manifest.load("StyleShardReward")
+        elements = StyleShardReward
     },
     ["useClientDecidedVehicleId"] = {
         -- dump: bool useClientDecidedVehicleId // 0x210

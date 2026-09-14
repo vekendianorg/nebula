@@ -27,9 +27,11 @@
 
 local M = {}
 
+local Logfile = loadModule("core/Logfile.lua")
+
 local function log(...)
     if Nebula ~= nil and Nebula.log then
-        print("[Nebula.Cache]", ...)
+        Logfile.log("[Nebula.Cache]", ...)
     end
 end
 

@@ -14,8 +14,20 @@
 --       public bool equipped_;     // 0x29
 
 return {
-    ["id"] = { offset = 0x18, type = "String" },
-    ["shards"] = { offset = 0x20, type = "SafeInt32" },
-    ["owned"] = { offset = 0x28, type = "Bool" },
-    ["equipped"] = { offset = 0x29, type = "Bool" },
+    ["id"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["shards"] = {
+        offset = 0x20,
+        type = "SafeInt32"
+    },
+    ["owned"] = {
+        offset = 0x28,
+        type = "Bool"
+    },
+    ["equipped"] = {
+        offset = 0x29,
+        type = "Bool"
+    },
 }

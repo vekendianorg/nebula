@@ -15,8 +15,20 @@
 --       public int levelUps;    // 0x48
 
 return {
-    ["id"] = { offset = 0x0, type = "String" },
-    ["type"] = { offset = 0x18, type = "String" },
-    ["vehicle"] = { offset = 0x30, type = "String" },
-    ["levelUps"] = { offset = 0x48, type = "Int32" },
+    ["id"] = {
+        offset = 0x0,
+        type = "String"
+    },
+    ["type"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["vehicle"] = {
+        offset = 0x30,
+        type = "String"
+    },
+    ["levelUps"] = {
+        offset = 0x48,
+        type = "Int32"
+    },
 }

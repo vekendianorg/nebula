@@ -1,0 +1,6 @@
+--==================================================
+-- core/types/JSONSafeInt.lua
+--==================================================
+-- Intentionally EMPTY placeholder.
+-- "JSONSafeInt" is same like SafeInt scalar:
+-- Just point to SafeInt.

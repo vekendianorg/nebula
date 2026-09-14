@@ -1,4 +1,16 @@
+--==================================================
+-- core/Path.lua
+--==================================================
+
 local M = {}
+
+local Logfile = loadModule("core/Logfile.lua")
+
+local function log(...)
+    if Nebula and Nebula.log then
+        Logfile.log("[Path]", ...)
+    end
+end
 
 function M.parse(id)
     local segments = {}
@@ -10,6 +22,7 @@ function M.parse(id)
             segments[#segments + 1] = { name = part }
         end
     end
+    log(string.format("parse '%s' -> %d segments", tostring(id), #segments))
     return segments
 end
 

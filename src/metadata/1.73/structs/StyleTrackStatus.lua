@@ -13,13 +13,20 @@
 --       public bool rewardclaimed_; // 0x38
 
 local Manifest = loadModule("metadata/manifest.lua")
+local StyleTrackItemStatus = Manifest.load("StyleTrackItemStatus")
 
 return {
-    ["trackId"] = { offset = 0x18, type = "String" },
+    ["trackId"] = {
+        offset = 0x18,
+        type = "String"
+    },
     ["items"] = {
         offset = 0x20,
         type = "Array",
-        elements = Manifest.load("StyleTrackItemStatus")
+        elements = StyleTrackItemStatus
     },
-    ["rewardClaimed"] = { offset = 0x38, type = "Bool" },
+    ["rewardClaimed"] = {
+        offset = 0x38,
+        type = "Bool"
+    },
 }

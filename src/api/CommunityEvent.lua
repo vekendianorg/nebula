@@ -34,5 +34,6 @@ local defineApi = loadModule("core/defineApi.lua")
 
 return defineApi.create({
     struct  = "EventDefinition",
+    name    = "CommunityEvent", -- log label: [PublicEvent]/[TeamEvent]/[CommunityEvent] trace lines
     resolve = Memory.resolveActiveCommunityEventBase,
 })

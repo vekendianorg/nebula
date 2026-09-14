@@ -90,9 +90,9 @@ local FixedVehicleDefinition      = Manifest.load("FixedVehicleDefinition")
 local SpecialFeatureDefinition    = Manifest.load("SpecialFeatureDefinition")
 
 -- Reference the shared per-class element templates.
-local LevelScript = Manifest.load("LevelScript")
-local UiElementDefinition = Manifest.load("UiElementDefinition")
-local CollectibleDefinition = Manifest.load("CollectibleDefinition")
+local LevelScript                 = Manifest.load("LevelScript")
+local UiElementDefinition         = Manifest.load("UiElementDefinition")
+local CollectibleDefinition       = Manifest.load("CollectibleDefinition")
 
 return {
     ["contentVersion"] = {
@@ -145,8 +145,14 @@ return {
         -- dump: EventsTabButtonIcon // 0xE0, INLINE member (next
         -- field eventMusic@0x110 -> gap 0x30 = sizeof
         -- (EventsTabButtonIcon)). Children carry ABSOLUTE offsets.
-        ["activeIcon"] = { offset = 0xE0, type = "String" },
-        ["inactiveIcon"] = { offset = 0xF8, type = "String" },
+        ["activeIcon"] = {
+            offset = 0xE0,
+            type = "String"
+        },
+        ["inactiveIcon"] = {
+            offset = 0xF8,
+            type = "String"
+        },
     },
     ["eventMusic"] = {
         offset = 0x110,
@@ -251,28 +257,94 @@ return {
         },
         -- === dump GameModeDefinition members added in the full-field
         -- === audit (base 0x198; offsets absolute) ===
-        ["title"] = { offset = 0x1A0, type = "String" },
-        ["description"] = { offset = 0x1B8, type = "String" },
-        ["finishMessage"] = { offset = 0x1D0, type = "String" },
-        ["didNotFinishMessage"] = { offset = 0x1E8, type = "String" },
-        ["resultIcon"] = { offset = 0x200, type = "String" },
-        ["raceType"] = { offset = 0x218, type = "Int32" },
-        ["wheelieMode"] = { offset = 0x224, type = "Bool" },
-        ["driverJumpMode"] = { offset = 0x225, type = "Bool" },
-        ["autoEjectOnDriverJump"] = { offset = 0x226, type = "Bool" },
-        ["driverJumpJetpack"] = { offset = 0x227, type = "Bool" },
-        ["driverJumpPerfectLandingDistanceBonus"] = { offset = 0x228, type = "Int32" },
-        ["driverJumpVehicleLandingDistanceBonus"] = { offset = 0x22C, type = "Int32" },
-        ["penaltyBar"] = { offset = 0x230, type = "Int32" },
-        ["targetDistanceObject"] = { offset = 0x238, type = "String" },
-        ["targetDistanceIcon"] = { offset = 0x250, type = "String" },
-        ["bonusTargetDefinition"] = { offset = 0x268, type = "Object" },
-        ["showCountdown"] = { offset = 0x2D8, type = "Bool" },
-        ["allowPointsAfterFinish"] = { offset = 0x2D9, type = "Bool" },
-        ["disablePlayerTuningParts"] = { offset = 0x2DA, type = "Bool" },
-        ["maxAllowedTuningParts"] = { offset = 0x2DC, type = "Int32" },
-        ["tricksMode"] = { offset = 0x2E0, type = "Int32" },
-        ["rounds"] = { offset = 0x3F8, type = "Object" },
+        ["title"] = {
+            offset = 0x1A0,
+            type = "String"
+        },
+        ["description"] = {
+            offset = 0x1B8,
+            type = "String"
+        },
+        ["finishMessage"] = {
+            offset = 0x1D0,
+            type = "String"
+        },
+        ["didNotFinishMessage"] = {
+            offset = 0x1E8,
+            type = "String"
+        },
+        ["resultIcon"] = {
+            offset = 0x200,
+            type = "String"
+        },
+        ["raceType"] = {
+            offset = 0x218,
+            type = "Int32"
+        },
+        ["wheelieMode"] = {
+            offset = 0x224,
+            type = "Bool"
+        },
+        ["driverJumpMode"] = {
+            offset = 0x225,
+            type = "Bool"
+        },
+        ["autoEjectOnDriverJump"] = {
+            offset = 0x226,
+            type = "Bool"
+        },
+        ["driverJumpJetpack"] = {
+            offset = 0x227,
+            type = "Bool"
+        },
+        ["driverJumpPerfectLandingDistanceBonus"] = {
+            offset = 0x228,
+            type = "Int32"
+        },
+        ["driverJumpVehicleLandingDistanceBonus"] = {
+            offset = 0x22C,
+            type = "Int32"
+        },
+        ["penaltyBar"] = {
+            offset = 0x230,
+            type = "Int32"
+        },
+        ["targetDistanceObject"] = {
+            offset = 0x238,
+            type = "String"
+        },
+        ["targetDistanceIcon"] = {
+            offset = 0x250,
+            type = "String"
+        },
+        ["bonusTargetDefinition"] = {
+            offset = 0x268,
+            type = "Object"
+        },
+        ["showCountdown"] = {
+            offset = 0x2D8,
+            type = "Bool"
+        },
+        ["allowPointsAfterFinish"] = {
+            offset = 0x2D9,
+            type = "Bool"
+        },
+        ["disablePlayerTuningParts"] = {
+            offset = 0x2DA,
+            type = "Bool"
+        },
+        ["maxAllowedTuningParts"] = {
+            offset = 0x2DC,
+            type = "Int32"
+        },
+        ["tricksMode"] = {
+            offset = 0x2E0,
+            type = "Int32"
+        },
+        ["rounds"] = {
+            offset = 0x3F8,
+            type = "Object"
+        },
         ["sessionRewards"] = {
             offset = 0x420,
             type = "Array",
@@ -287,14 +359,20 @@ return {
             elementStride = 0x10,
             elements = LevelScript
         },
-        ["defaultRunCountLimit"] = { offset = 0x450, type = "Int32" },
+        ["defaultRunCountLimit"] = {
+            offset = 0x450,
+            type = "Int32"
+        },
         ["bannedVehicles"] = {
             offset = 0x488,
             type = "Array",
             elementType = "String",
             elementStride = 0x18
         },
-        ["tuningPartsOverride"] = { offset = 0x4B8, type = "String" },
+        ["tuningPartsOverride"] = {
+            offset = 0x4B8,
+            type = "String"
+        },
         ["joinWindow"] = {
             offset = 0x220,
             type = "Int32"
@@ -428,7 +506,7 @@ return {
     },
     ["specialFeatures"] = {
         offset = 0x4D0,
-        type = "Array",
+        type = "Object",
         elements = SpecialFeatureDefinition
     },
     ["eventRewards"] = {

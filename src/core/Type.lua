@@ -1,33 +1,42 @@
 --==================================================
 -- core/Type.lua
 --==================================================
--- Central registry mapping metadata `type` strings to their
--- get/set implementation modules. Adding a new type = add a file
--- to core/types/ and register it here.
 
 local M = {}
 
 local registry = {
     Int32       = loadModule("core/types/Int32.lua"),
     SafeInt32   = loadModule("core/types/SafeInt32.lua"),
+    SafeInt     = loadModule("core/types/SafeInt.lua"),
+    JSONSafeInt = loadModule("core/types/SafeInt.lua"),
+    Int64       = loadModule("core/types/Int64.lua"),
     Bool        = loadModule("core/types/Bool.lua"),
     Float       = loadModule("core/types/Float.lua"),
     String      = loadModule("core/types/String.lua"),
     BitMask     = loadModule("core/types/BitMask.lua"),
     Enum        = loadModule("core/types/Enum.lua"),
+    Vec2        = loadModule("core/types/Vec2.lua"),
+    Color3B     = loadModule("core/types/Color3B.lua"),
 }
 
----@param typeName string
----@return table|nil implementation
-function M.resolve(typeName)
-    return registry[typeName]
+local Logfile = loadModule("core/Logfile.lua")
+
+local function log(...)
+    if Nebula and Nebula.log then
+        Logfile.log("[Type]", ...)
+    end
 end
 
----Register a new type implementation at runtime (for modules that
----want to extend Nebula without editing this file).
----@param typeName string
----@param implementation table @ must expose get(base, field) and set(base, field, value)
+function M.resolve(typeName)
+    local impl = registry[typeName]
+    if not impl then
+        log(string.format("resolve FAILED: unknown type '%s'", tostring(typeName)))
+    end
+    return impl
+end
+
 function M.register(typeName, implementation)
+    log(string.format("register type '%s'", tostring(typeName)))
     registry[typeName] = implementation
 end
 

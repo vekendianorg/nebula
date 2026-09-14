@@ -21,12 +21,30 @@
 --       public UiElementTriggerDefinition trigger; // 0x70
 
 return {
-    ["id"] = { offset = 0x0, type = "String" },
-    ["file"] = { offset = 0x18, type = "String" },
-    ["actionTimeline"] = { offset = 0x30, type = "String" },
-    ["loopAction"] = { offset = 0x48, type = "Bool" },
-    ["parentNode"] = { offset = 0x50, type = "String" },
-    ["showTimes"] = { offset = 0x68, type = "Int32" },
+    ["id"] = {
+        offset = 0x0,
+        type = "String"
+    },
+    ["file"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["actionTimeline"] = {
+        offset = 0x30,
+        type = "String"
+    },
+    ["loopAction"] = {
+        offset = 0x48,
+        type = "Bool"
+    },
+    ["parentNode"] = {
+        offset = 0x50,
+        type = "String"
+    },
+    ["showTimes"] = {
+        offset = 0x68,
+        type = "Int32"
+    },
     ["triggerGamemodes"] = {
         -- UiElementTriggerDefinition.gamemodes @0x70 (List<string>,
         -- inline std::vector<std::string>, string stride 0x18)

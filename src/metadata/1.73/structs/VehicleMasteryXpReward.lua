@@ -13,6 +13,12 @@
 --       public int amount;       // 0x18
 
 return {
-    ["vehicleId"] = { offset = 0x0, type = "String" },
-    ["amount"] = { offset = 0x18, type = "Int32" },
+    ["vehicleId"] = {
+        offset = 0x0,
+        type = "String"
+    },
+    ["amount"] = {
+        offset = 0x18,
+        type = "Int32"
+    },
 }

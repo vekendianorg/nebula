@@ -15,45 +15,130 @@
 
 local Manifest = loadModule("metadata/manifest.lua")
 
-local StringIntMap      = Manifest.load("StringIntMap")
-local UpgradeStatus     = Manifest.load("UpgradeStatus")
-local DistanceHighscore = Manifest.load("DistanceHighscore")
-local TimeTrialHighscore = Manifest.load("TimeTrialHighscore")
-local VehicleStats      = Manifest.load("VehicleStats")
-local StyleRewardTrack  = Manifest.load("StyleRewardTrack")
+local StringIntMap         = Manifest.load("StringIntMap")
+local UpgradeStatus        = Manifest.load("UpgradeStatus")
+local DistanceHighscore    = Manifest.load("DistanceHighscore")
+local TimeTrialHighscore   = Manifest.load("TimeTrialHighscore")
+local VehicleStats         = Manifest.load("VehicleStats")
+local StyleRewardTrack     = Manifest.load("StyleRewardTrack")
+local VehicleCustomization = Manifest.load("VehicleCustomization")
+local TuningPartStatus     = Manifest.load("TuningPartStatus")
+local TuningPartPreset     = Manifest.load("TuningPartPreset")
+local MasteryStatus        = Manifest.load("MasteryStatus")
+local StyleTrackStatus     = Manifest.load("StyleTrackStatus")
 
 -- vehicleStats is a POINTER member (8-byte slot, deref'd via Object);
 -- children are read at VehicleStats-relative offsets.
-local vehicleStatsObj = { offset = 0x50, type = "Object" }
-for k, v in pairs(VehicleStats) do vehicleStatsObj[k] = v end
 
 -- styleRewardTrack is a POINTER member (8-byte slot, deref'd via
 -- Object); children come from the StyleRewardTrack snapshot.
-local styleRewardTrackObj = { offset = 0x188, type = "Object" }
-for k, v in pairs(StyleRewardTrack) do styleRewardTrackObj[k] = v end
 
 return {
-    ["vehicleId"] = { offset = 0x18, type = "String" },
-    ["upgrades"] = { offset = 0x20, type = "Array", elements = UpgradeStatus },
-    ["customizations"] = { offset = 0x38, type = "Array", elements = Manifest.load("VehicleCustomization") },
-    ["vehicleStats"] = vehicleStatsObj,
-    ["tuningParts"] = { offset = 0x58, type = "Array", elements = Manifest.load("TuningPartStatus") },
-    ["equippedTuningParts"] = { offset = 0x70, type = "Array", elementType = "String" },
-    ["specialFeatureUpgrades"] = { offset = 0x150, type = "Array", elements = UpgradeStatus },
-    ["distanceHighscores"] = { offset = 0x88, type = "Array", elements = DistanceHighscore },
-    ["timeTrialHighscores"] = { offset = 0xA0, type = "Array", elements = TimeTrialHighscore },
-    ["newDistanceHighscores"] = { offset = 0xB8, type = "Array", elements = DistanceHighscore },
-    ["newTimeTrialHighscores"] = { offset = 0xD0, type = "Array", elements = TimeTrialHighscore },
-    ["distanceTarget"] = { offset = 0xF0, type = "Array", elements = StringIntMap },
-    ["tuningPartPresets"] = { offset = 0x108, type = "Array", elements = Manifest.load("TuningPartPreset") },
-    ["selectedPresetIndex"] = { offset = 0xEC, type = "Int32" },
-    ["vehiclePower"] = { offset = 0x140, type = "Int32" },
-    ["masteryStatus"] = { offset = 0x120, type = "Array", elements = Manifest.load("MasteryStatus") },
-    ["masteryXp"] = { offset = 0x138, type = "SafeInt32" },
-    ["currentVehicleWinStreak"] = { offset = 0x144, type = "Int32" },
-    ["pendingMasteryXp"] = { offset = 0x148, type = "SafeInt32" },
-    ["maxLevelBoostExpiryTimestamp"] = { offset = 0x168, type = "SafeInt32" },
-    ["styleTracks"] = { offset = 0x170, type = "Array", elements = Manifest.load("StyleTrackStatus") },
-    ["styleRewardTrack"] = styleRewardTrackObj,  -- StyleRewardTrack
-    ["bestVehicleWinStreak"] = { offset = 0x190, type = "Int32" },
+    ["vehicleId"] = {
+        offset = 0x18,
+        type = "String"
+    },
+    ["upgrades"] = {
+        offset = 0x20,
+        type = "Array",
+        elements = UpgradeStatus
+    },
+    ["customizations"] = {
+        offset = 0x38,
+        type = "Array",
+        elements = VehicleCustomization
+    },
+    ["vehicleStats"] = {
+        offset = 0x50,
+        type = "Object",
+        elements = VehicleStats
+    },
+    ["tuningParts"] = {
+        offset = 0x58,
+        type = "Array",
+        elements = TuningPartStatus
+    },
+    ["equippedTuningParts"] = {
+        offset = 0x70,
+        type = "Array",
+        elementType = "String"
+    },
+    ["specialFeatureUpgrades"] = {
+        offset = 0x150,
+        type = "Array",
+        elements = UpgradeStatus
+    },
+    ["distanceHighscores"] = {
+        offset = 0x88,
+        type = "Array",
+        elements = DistanceHighscore
+    },
+    ["timeTrialHighscores"] = {
+        offset = 0xA0,
+        type = "Array",
+        elements = TimeTrialHighscore
+    },
+    ["newDistanceHighscores"] = {
+        offset = 0xB8,
+        type = "Array",
+        elements = DistanceHighscore
+    },
+    ["newTimeTrialHighscores"] = {
+        offset = 0xD0,
+        type = "Array",
+        elements = TimeTrialHighscore
+    },
+    ["distanceTarget"] = {
+        offset = 0xF0,
+        type = "Array",
+        elements = StringIntMap
+    },
+    ["tuningPartPresets"] = {
+        offset = 0x108,
+        type = "Array",
+        elements = TuningPartPreset
+    },
+    ["selectedPresetIndex"] = {
+        offset = 0xEC,
+        type = "Int32"
+    },
+    ["vehiclePower"] = {
+        offset = 0x140,
+        type = "Int32"
+    },
+    ["masteryStatus"] = {
+        offset = 0x120,
+        type = "Array",
+        elements = MasteryStatus
+    },
+    ["masteryXp"] = {
+        offset = 0x138,
+        type = "SafeInt32"
+    },
+    ["currentVehicleWinStreak"] = {
+        offset = 0x144,
+        type = "Int32"
+    },
+    ["pendingMasteryXp"] = {
+        offset = 0x148,
+        type = "SafeInt32"
+    },
+    ["maxLevelBoostExpiryTimestamp"] = {
+        offset = 0x168,
+        type = "SafeInt32"
+    },
+    ["styleTracks"] = {
+        offset = 0x170,
+        type = "Array",
+        elements = StyleTrackStatus
+    },
+    ["styleRewardTrack"] = {
+        offset = 0x188,
+        type = "Object",
+        elements = StyleRewardTrack
+    },  -- StyleRewardTrack
+    ["bestVehicleWinStreak"] = {
+        offset = 0x190,
+        type = "Int32"
+    },
 }

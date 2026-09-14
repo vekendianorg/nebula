@@ -1,8 +1,10 @@
-
-
-local function log(...)
-    if Nebula and Nebula.verbose then
-        print("[core.types.Array]", ...)
-    end
-end
-
+--==================================================
+-- core/types/Array.lua
+--==================================================
+-- Intentionally EMPTY placeholder. "Array" is not a Type-registry
+-- scalar: Array/repeated fields are dispatched to core/Repeated.lua
+-- by core/Field.lua / core/defineApi.lua / core/Struct.lua BEFORE
+-- Type.resolve() is ever consulted. Nothing loads this file; it
+-- exists only so the types/ directory doesn't lose the name. The
+-- old verbose-gated log() stub here was dead (never called) and
+-- has been removed.

@@ -1,0 +1,56 @@
+---@class cocos2d_ui_RelativeLayoutParameter_RelativeAlign
+-- Source (IL2CPP dump): cocos2d::ui::RelativeLayoutParameter
+-- Auto-generated from a bulk enum dump (enums.cs). Not
+-- individually curated/cross-referenced like ChestType/TuningRarity/
+-- UnlockType/GameStatusFlag — verify a given ID against on-device
+-- behavior before relying on it for anything write-side.
+return {
+    byId = {
+        [0] = "NONE",
+        [1] = "PARENT_TOP_LEFT",
+        [2] = "PARENT_TOP_CENTER_HORIZONTAL",
+        [3] = "PARENT_TOP_RIGHT",
+        [4] = "PARENT_LEFT_CENTER_VERTICAL",
+        [5] = "CENTER_IN_PARENT",
+        [6] = "PARENT_RIGHT_CENTER_VERTICAL",
+        [7] = "PARENT_LEFT_BOTTOM",
+        [8] = "PARENT_BOTTOM_CENTER_HORIZONTAL",
+        [9] = "PARENT_RIGHT_BOTTOM",
+        [10] = "LOCATION_ABOVE_LEFTALIGN",
+        [11] = "LOCATION_ABOVE_CENTER",
+        [12] = "LOCATION_ABOVE_RIGHTALIGN",
+        [13] = "LOCATION_LEFT_OF_TOPALIGN",
+        [14] = "LOCATION_LEFT_OF_CENTER",
+        [15] = "LOCATION_LEFT_OF_BOTTOMALIGN",
+        [16] = "LOCATION_RIGHT_OF_TOPALIGN",
+        [17] = "LOCATION_RIGHT_OF_CENTER",
+        [18] = "LOCATION_RIGHT_OF_BOTTOMALIGN",
+        [19] = "LOCATION_BELOW_LEFTALIGN",
+        [20] = "LOCATION_BELOW_CENTER",
+        [21] = "LOCATION_BELOW_RIGHTALIGN",
+    },
+    byName = {
+        NONE = 0,
+        PARENT_TOP_LEFT = 1,
+        PARENT_TOP_CENTER_HORIZONTAL = 2,
+        PARENT_TOP_RIGHT = 3,
+        PARENT_LEFT_CENTER_VERTICAL = 4,
+        CENTER_IN_PARENT = 5,
+        PARENT_RIGHT_CENTER_VERTICAL = 6,
+        PARENT_LEFT_BOTTOM = 7,
+        PARENT_BOTTOM_CENTER_HORIZONTAL = 8,
+        PARENT_RIGHT_BOTTOM = 9,
+        LOCATION_ABOVE_LEFTALIGN = 10,
+        LOCATION_ABOVE_CENTER = 11,
+        LOCATION_ABOVE_RIGHTALIGN = 12,
+        LOCATION_LEFT_OF_TOPALIGN = 13,
+        LOCATION_LEFT_OF_CENTER = 14,
+        LOCATION_LEFT_OF_BOTTOMALIGN = 15,
+        LOCATION_RIGHT_OF_TOPALIGN = 16,
+        LOCATION_RIGHT_OF_CENTER = 17,
+        LOCATION_RIGHT_OF_BOTTOMALIGN = 18,
+        LOCATION_BELOW_LEFTALIGN = 19,
+        LOCATION_BELOW_CENTER = 20,
+        LOCATION_BELOW_RIGHTALIGN = 21,
+    },
+}

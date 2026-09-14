@@ -1,13 +1,14 @@
 ## TeamEvent
 
-Read fields off whichever `TeamEvent` struct is
+Read and write fields off whichever `TeamEvent` struct is
 currently active in memory. Same surface as `PublicEvent` —
-`get(fieldName)`, `get()`, `fields()`, `meta(fieldName)` — but
-its metadata mirrors `PublicEvent`'s shared header while patching its
-own divergent tail (`multiRaceGameModes`, `winningTeamReward` instead
-of `fixedVehicles`/`specialFeatures`/`eventSpecials`/`premiumEventRewards`),
-and it resolves its base address independently — see
-`metadata/TeamEvent.lua` and [Mirrored metadata](#mirrored-metadata).
+`get(fieldName)`, `get()`, `set(fieldName, value)`, `fields()`,
+`meta(fieldName)` — bound to the same shared
+`metadata/<version>/structs/EventDefinition.lua` struct as
+`PublicEvent` and `CommunityEvent` (see
+[Versioned metadata](#versioned-metadata)), including its
+`multiRaceGameModes`/`winningTeamReward` tail fields, and it resolves
+its base address independently.
 
 ### TeamEvent.get(fieldName)
 
@@ -17,7 +18,7 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/TeamEvent.lua`, e.g. `"minTeamSizeToJoin"` or `"sessionEntry.entryFeeTickets"`
+- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"minTeamSizeToJoin"` or `"sessionEntry.entryFeeTickets"`
 
 **Returns**
 
@@ -43,6 +44,25 @@ step is needed to trigger resolution.
 local TeamEvent = Nebula.TeamEvent.get()
 TeamEvent.get("minTeamSizeToJoin")
 TeamEvent.get("sessionEntry.numberOfParallelSessions")
+```
+
+### TeamEvent.set(fieldName, value)
+
+Writes a field value to the currently-active TeamEvent struct.
+Returns a chainable operation object supporting `:dry()`.
+
+**Parameters**
+
+- `fieldName` (string) — the field's dotted name
+- `value` (number | string | table) — the value to write
+
+**Returns**
+
+(table) — a chainable operation object; already executed
+
+```lua
+Nebula.TeamEvent.set("startTime", 1700000000)
+Nebula.TeamEvent.set("startTime", 1700000000):dry()
 ```
 
 ### TeamEvent.fields()
@@ -78,8 +98,9 @@ local meta = Nebula.TeamEvent.meta("minTeamSizeToJoin")
 print(meta.name, meta.type, meta.offset, meta.known)
 ```
 
-> **Offset verification status**: TeamEvent's header is mirrored from
-> `metadata/PublicEvent.lua`, which has been fully cross-referenced
+> **Offset verification status**: TeamEvent's header comes from the
+> same shared `metadata/<version>/structs/EventDefinition.lua` snapshot
+> as PublicEvent, which has been fully cross-referenced
 > against the IL2CPP struct dump (`libcocos2dcpp.cs`). The dump shows
 > team event definitions are stored in
 > `Dictionary<string, Pointer<EventDefinition>>` — the same
