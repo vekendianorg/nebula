@@ -45,6 +45,10 @@ body.page-exit { opacity: 0; transition: opacity 0.15s ease; }
 
 body.locked { overflow: hidden; }
 
+/* last-resort clamp applied by nav.js auto-fit when it measures real
+ * horizontal overflow after load */
+html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
+
 ::selection { background: var(--accent-dim); }
 
 /* Scrollbars */
@@ -672,16 +676,13 @@ body.locked { overflow: hidden; }
 
 /* ================= Responsive ================= */
 
-/* ================= Tablet ================= */
+/* ================= Small screens: phones + tablets portrait =================
+ * Everything up to 1024px gets the single-column layout that cannot
+ * overflow horizontally - regardless of what viewport width the
+ * browser reports (desktop-mode requests, foldables, WebViews). */
 
 @media (max-width: 1024px) {
-    .doc-layout { gap: 2rem; }
-    .doc-sidebar { width: 210px; }
-}
-
-/* ================= Phone ================= */
-
-@media (max-width: 860px) {
+    html { overflow-x: hidden; } /* no sticky sidebar below 1024px: safe */
     :root { --nav-h: 52px; }
 
     body { font-size: 15.5px; }
@@ -772,6 +773,13 @@ body.locked { overflow: hidden; }
     .search-hint { display: none; }
 }
 
+/* Tablet portrait (861-1024px): same single-column layout, centered */
+@media (min-width: 861px) and (max-width: 1024px) {
+    .doc-content { max-width: 46rem; margin-left: auto; margin-right: auto; }
+    .hero-title { font-size: 3rem; }
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 400px) {
     .nav-links { gap: 0.2rem; }
     .nav-links a, .nav-links button { font-size: 0.85rem; padding: 0.6rem 0.45rem; }
@@ -791,7 +799,7 @@ body.locked { overflow: hidden; }
 
 /* ================= Landscape phones (horizontal layout) ================= */
 
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 550px) {
     :root { --nav-h: 46px; }
 
     body { font-size: 15px; }

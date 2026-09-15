@@ -74,7 +74,37 @@
         document.body.classList.remove('page-exit');
     });
 
-    /* ================= 4. Active nav link ================= */
+    /* ================= 4. Auto-fit guard =================
+     * Resolution-independent safety net: after the page settles,
+     * MEASURE whether it actually overflows horizontally. If it
+     * does (quirky viewport, desktop-mode request, a wide element
+     * nobody predicted), clamp the page so it never scrolls
+     * sideways, and log the widest offenders to the console for
+     * debugging. Re-checks on resize / rotation; removes the clamp
+     * again if the page fits. */
+    function autoFit() {
+        var doc = document.documentElement;
+        var fits = doc.scrollWidth <= doc.clientWidth + 1;
+        doc.classList.toggle('fit-clamped', !fits);
+        if (!fits && window.console && console.warn) {
+            var vw = doc.clientWidth;
+            var offenders = [];
+            doc.querySelectorAll('body *').forEach(function(el) {
+                var r = el.getBoundingClientRect();
+                if (r.right > vw + 1) {
+                    var name = el.tagName.toLowerCase();
+                    if (typeof el.className === 'string' && el.className) name += '.' + el.className.trim().split(/\s+/).join('.');
+                    offenders.push(name);
+                }
+            });
+            console.warn('[nebula] horizontal overflow auto-clamped. Widest elements:', offenders.slice(0, 5));
+        }
+    }
+    if (document.readyState === 'complete') autoFit();
+    else window.addEventListener('load', autoFit);
+    window.addEventListener('resize', autoFit);
+
+    /* ================= 5. Active nav link ================= */
     // Compare full pathnames (not just the trailing segment) so this
     // keeps working regardless of which subpath the site is deployed
     // under (e.g. GitHub Pages project sites live under /repo-name/).

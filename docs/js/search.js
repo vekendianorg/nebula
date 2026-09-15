@@ -6,7 +6,7 @@
  * only ever built from docs.html's content — results always link to
  * `docs.html#<section-id>`.
  *
- * Data source: /assets/search-index.json, generated from README.md at
+ * Data source: /assets/search-index.json?v=2, generated from README.md at
  * build time (see scripts/build-docs.py). Each entry looks like:
  *   { "id": "bitmask", "title": "BitMask", "level": 3, "snippet": "..." }
  *
