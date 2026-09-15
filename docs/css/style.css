@@ -491,7 +491,8 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
     margin: 0;
     background: var(--bg-code);
     padding: 1rem 1.1rem;
-    overflow-x: auto;
+    overflow-x: auto;              /* code blocks side-scroll, never wrap */
+    max-width: 100%;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
     font-family: var(--font-mono);
@@ -607,19 +608,20 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
 }
 
 .license-box {
-    background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 2rem;
     margin-top: 1.5rem;
 }
 
+/* The license is legal text - format it like a plain document:
+ * mono, readable size, normal color, natural wrapping. */
 .license-box pre {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    line-height: 1.7;
+    font-size: 0.9rem;
+    line-height: 1.8;
     white-space: pre-wrap;
-    color: var(--text-secondary);
+    color: var(--text-primary);
 }
 
 .license-meta { display: flex; gap: 0.6rem; margin-top: 1.25rem; flex-wrap: wrap; }
@@ -685,6 +687,13 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
     html { overflow-x: hidden; } /* no sticky sidebar below 1024px: safe */
     :root { --nav-h: 52px; }
 
+    /* CRITICAL: the base .doc-layout uses align-items: flex-start (desktop
+     * row layout). In this column layout that makes children shrink-to-fit
+     * their CONTENT width - the docs column measured 832px on a 360px
+     * phone, which was then clipped with no scroll. Force full-width. */
+    .doc-layout { align-items: stretch; }
+    .doc-content { width: 100%; }
+
     body { font-size: 15.5px; }
 
     .nav { padding: 0 1rem; padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
@@ -702,12 +711,7 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
     .hero { padding: 4.5rem 1.1rem 3rem; }
     .hero-subtitle { font-size: 0.95rem; }
     .hero-code { width: 100%; margin-top: 2.25rem; }
-    .hl {
-        font-size: 0.72rem;
-        padding: 0.85rem 0.95rem;
-        white-space: pre-wrap;      /* wrap long lines instead of h-scroll */
-        overflow-wrap: anywhere;
-    }
+    .hl { font-size: 0.72rem; padding: 0.85rem 0.95rem; }
     .feature-grid { width: 100%; grid-template-columns: 1fr; margin-top: 2.25rem; gap: 0.6rem; }
     .hero-footer { padding: 0 1.25rem 1.25rem; }
 
@@ -811,12 +815,7 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
     .hero-actions { margin-top: 1.1rem; }
     .hero-actions .btn { padding: 0.55rem 1.1rem; }
     .hero-code { margin-top: 1.5rem; width: min(92vw, 560px); }
-    .hl {
-        font-size: 0.68rem;
-        padding: 0.7rem 0.9rem;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-    }
+    .hl { font-size: 0.68rem; padding: 0.7rem 0.9rem; }
     .feature-grid {
         grid-template-columns: repeat(2, 1fr);
         margin-top: 1.5rem;

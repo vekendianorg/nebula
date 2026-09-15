@@ -3,18 +3,18 @@
 Read and write fields on the game's global configuration singleton.
 Unlike `GameStatus` (the player's save) and the event modules
 (per-instance structs in memory), there is exactly one `GameData` per
-running game. Every method is metadata-driven — the field list comes
+running game. Every method is metadata-driven, the field list comes
 from `metadata/<version>/structs/GameData.lua` (the version folder is
 picked automatically from the running game's version, e.g. `1.74.2`
-resolves `1.74` — see [Versioned metadata](#versioned-metadata)), not
+resolves `1.74`, see [Versioned metadata](#versioned-metadata)), not
 from hardcoded offsets in this module. The struct's layout is supplied
-whole by the IL2CPP dump (Size `0x548`, Confidence: exact) — all 141
+whole by the IL2CPP dump (Size `0x548`, Confidence: exact), all 141
 declared fields are offset-verified with no placeholders, and the
 layout is identical across the 1.73 and 1.74 snapshots (only nested
 templates like `ReviewConditions` keep resolving per-version through
 the manifest).
 
-The base address is resolved via AOB byte-signature scanning — the scan
+The base address is resolved via AOB byte-signature scanning, the scan
 is authoritative for fresh discovery, with a validated cache as a
 supplement. Since `GameData` is a singleton, the first validated
 candidate wins rather than the per-instance enumeration used by the
@@ -37,11 +37,11 @@ table; nested struct-element arrays (`leagueDefinitions`,
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/GameData.lua`, e.g. `"maxVisibleRange"` or `"leagueDefinitions[1].title"`
+- `fieldName` (string), the field's dotted name as declared in `metadata/<version>/structs/GameData.lua`, e.g. `"maxVisibleRange"` or `"leagueDefinitions[1].title"`
 
 **Returns**
 
-(number | string | boolean | table) — the field's current value, typed according to its metadata entry
+(number | string | boolean | table), the field's current value, typed according to its metadata entry
 
 ```lua
 local showGhosts = Nebula.GameData.get("showMoreGhostsMode")
@@ -58,7 +58,7 @@ immediately and returns an accessor object with its own
 
 **Returns**
 
-(table) — an object with `base` and a `get(fieldName)` field, or `nil` plus an error string (`"no_game_data"`) if no candidate base survived validation
+(table), an object with `base` and a `get(fieldName)` field, or `nil` plus an error string (`"no_game_data"`) if no candidate base survived validation
 
 ```lua
 local gd = Nebula.GameData.get()
@@ -77,19 +77,19 @@ against what was written).
 
 Indexed element paths (`"leagueDefinitions[1]"`) accept a **table
 value to write the whole element struct**: only the keys you provide
-are written — sibling fields stay intact, the existing instance is
+are written, sibling fields stay intact, the existing instance is
 edited in place (never re-allocated), and unknown keys are a safe
 no-op. A non-table value for an element path is rejected with
 `value_not_table`; a null element pointer with `null_element_ptr`.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
-- `value` (number | string | boolean | table) — the value to write; `Enum` fields accept either the string name or the numeric id; element paths take a partial struct table
+- `fieldName` (string), the field's dotted name
+- `value` (number | string | boolean | table), the value to write; `Enum` fields accept either the string name or the numeric id; element paths take a partial struct table
 
 **Returns**
 
-(table) — a chainable operation object; already executed. After
+(table), a chainable operation object; already executed. After
 `:verify()`, `op._verified` (boolean) and `op._actual` (the decoded
 read-back value) carry the comparison result
 
@@ -115,7 +115,7 @@ nested struct-element arrays.
 
 **Returns**
 
-(table) — a sorted array of field-name strings
+(table), a sorted array of field-name strings
 
 ```lua
 for _, id in ipairs(Nebula.GameData.fields()) do
@@ -130,11 +130,11 @@ value.
 
 **Parameters**
 
-- `fieldName` (string) — the field's name as declared in `metadata/<version>/structs/GameData.lua`
+- `fieldName` (string), the field's name as declared in `metadata/<version>/structs/GameData.lua`
 
 **Returns**
 
-(table) — `{ name, type, offset, repeated, known, address }` — `address` is only populated once a base has been resolved
+(table), `{ name, type, offset, repeated, known, address }`, `address` is only populated once a base has been resolved
 
 ```lua
 local meta = Nebula.GameData.meta("minVisibleRange")
@@ -145,6 +145,6 @@ print(meta.name, meta.type, meta.offset, meta.known)
 > `tutorialRubberbandingType`, is backed by
 > `metadata/<version>/enums/GameData_RubberbandingType.lua`, which was
 > auto-generated from a bulk enum dump rather than individually
-> curated like `ChestType`/`TuningRarity`/`UnlockType` — verify a
+> curated like `ChestType`/`TuningRarity`/`UnlockType`, verify a
 > given id against on-device behavior before relying on it for
 > anything write-side.

@@ -1,14 +1,14 @@
 ## PublicEvent
 
 Read and write fields off whichever `PublicEvent` struct is currently
-active in memory. Like `GameStatus`, every method is metadata-driven —
+active in memory. Like `GameStatus`, every method is metadata-driven -
 the field list comes from `metadata/<version>/structs/EventDefinition.lua`,
 the single shared struct backing `PublicEvent`, `TeamEvent`, and
 `CommunityEvent` (see [Versioned metadata](#versioned-metadata)), not
 from hardcoded offsets in this module. Unlike `GameStatus`'s single fixed struct,
 there can be several `PublicEvent` instances in memory at once
 (past/current/upcoming events); base resolution picks out whichever
-one's `startTime`/`endTime` window contains the current time — see
+one's `startTime`/`endTime` window contains the current time, see
 [Base address resolution](#base-address-resolution).
 
 ### PublicEvent.get(fieldName)
@@ -19,11 +19,11 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"gameMode.duration"`
+- `fieldName` (string), the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"gameMode.duration"`
 
 **Returns**
 
-(number | string | table) — the field's current value, typed according to its metadata entry
+(number | string | table), the field's current value, typed according to its metadata entry
 
 ```lua
 local startTime = Nebula.PublicEvent.get("startTime")
@@ -38,11 +38,11 @@ own `get(fieldName)` bound to that exact snapshot. Prefer this over
 the plain `get(fieldName)` form when reading several fields off the
 same event, so a sequence of reads stays consistent even if
 resolution were to happen again in between. No separate step is
-needed to trigger resolution — `get()` alone does it.
+needed to trigger resolution, `get()` alone does it.
 
 **Returns**
 
-(table) — an object with a `get(fieldName)` field, or `nil` plus an error string if no event is currently active
+(table), an object with a `get(fieldName)` field, or `nil` plus an error string if no event is currently active
 
 ```lua
 local event = Nebula.PublicEvent.get()
@@ -57,12 +57,12 @@ Returns a chainable operation object supporting `:dry()`.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
-- `value` (number | string | table) — the value to write
+- `fieldName` (string), the field's dotted name
+- `value` (number | string | table), the value to write
 
 **Returns**
 
-(table) — a chainable operation object; already executed
+(table), a chainable operation object; already executed
 
 ```lua
 Nebula.PublicEvent.set("startTime", 1700000000)
@@ -79,7 +79,7 @@ excluded.
 
 **Returns**
 
-(table) — a sorted array of dotted field-name strings
+(table), a sorted array of dotted field-name strings
 
 ```lua
 for _, id in ipairs(Nebula.PublicEvent.fields()) do
@@ -94,11 +94,11 @@ value.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
+- `fieldName` (string), the field's dotted name
 
 **Returns**
 
-(table) — `{ name, type, offset, repeated, known, address }` — `address` is only populated once a base has been resolved
+(table), `{ name, type, offset, repeated, known, address }`, `address` is only populated once a base has been resolved
 
 ```lua
 local meta = Nebula.PublicEvent.meta("minTeamSizeToJoin")
@@ -108,7 +108,7 @@ print(meta.name, meta.type, meta.offset, meta.known)
 > **Offset verification status**: All PublicEvent field offsets have been
 > cross-referenced against the IL2CPP struct dump (`libcocos2dcpp.cs`).
 > The dump shows the game stores event definitions in
-> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `Dictionary<string, Pointer<EventDefinition>>`, the same
 > `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
 > PublicEvent, TeamEvent and CommunityEvent. Four previously-unknown
 > offsets (`gameMode.gameMode`, `levelPool.poolOrder`,
@@ -116,7 +116,7 @@ print(meta.name, meta.type, meta.offset, meta.known)
 > `startTime` was corrected from `0x14C` to `0x150` (the dump has
 > `startTimeLive` at `0x14C` and `startTime` at `0x150`; a new
 > `startTimeLive` field exposes the former). The field
-> `gameMode.maxBotCount` remains at `0xBAAD` — it was not found in the
+> `gameMode.maxBotCount` remains at `0xBAAD`, it was not found in the
 > current `GameModeDefinition` struct in the dump and may have been removed
 > or renamed. Fields with `known = false` (still at `0xBAAD`) are excluded
 > from `fields()` output.

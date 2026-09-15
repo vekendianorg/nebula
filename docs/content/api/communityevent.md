@@ -2,7 +2,7 @@
 
 Read and write fields off whichever `CommunityEvent` (CommunityShowcase)
 struct is currently active in memory. Like the other event modules,
-every method is metadata-driven — the field list comes from the same
+every method is metadata-driven, the field list comes from the same
 shared `metadata/<version>/structs/EventDefinition.lua` snapshot used
 by `PublicEvent` and `TeamEvent` (see
 [Versioned metadata](#versioned-metadata)). Unlike `PublicEvent` and `TeamEvent`
@@ -10,7 +10,7 @@ which use AOB byte-signature scanning, CommunityEvent uses
 string-search resolution: it searches for the ASCII bytes of
 `"community Showcase\0"` and validates hits via a vtable marker
 (`0x6D6F631E` at `base + 0x8`). This is a simpler struct than
-PublicEvent/TeamEvent — no reward/loot fields, no contentVersion.
+PublicEvent/TeamEvent, no reward/loot fields, no contentVersion.
 
 ### CommunityEvent.get(fieldName)
 
@@ -20,11 +20,11 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"sessionEntry.entryFeeTickets"`
+- `fieldName` (string), the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"startTime"` or `"sessionEntry.entryFeeTickets"`
 
 **Returns**
 
-(number | string | table) — the field's current value, typed according to its metadata entry
+(number | string | table), the field's current value, typed according to its metadata entry
 
 ```lua
 local startTime = Nebula.CommunityEvent.get("startTime")
@@ -41,7 +41,7 @@ same event.
 
 **Returns**
 
-(table) — an object with a `get(fieldName)` field, or `nil` plus an error string if no event is currently active
+(table), an object with a `get(fieldName)` field, or `nil` plus an error string if no event is currently active
 
 ```lua
 local event = Nebula.CommunityEvent.get()
@@ -56,12 +56,12 @@ Returns a chainable operation object supporting `:dry()`.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
-- `value` (number | string | table) — the value to write
+- `fieldName` (string), the field's dotted name
+- `value` (number | string | table), the value to write
 
 **Returns**
 
-(table) — a chainable operation object; already executed
+(table), a chainable operation object; already executed
 
 ```lua
 Nebula.CommunityEvent.set("startTime", 1700000000)
@@ -76,7 +76,7 @@ offset. Fields still at the `0xBAAD` placeholder in
 
 **Returns**
 
-(table) — a sorted array of dotted field-name strings
+(table), a sorted array of dotted field-name strings
 
 ```lua
 for _, id in ipairs(Nebula.CommunityEvent.fields()) do
@@ -91,11 +91,11 @@ value.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
+- `fieldName` (string), the field's dotted name
 
 **Returns**
 
-(table) — `{ name, type, offset, repeated, known, address }` — `address` is only populated once a base has been resolved
+(table), `{ name, type, offset, repeated, known, address }`, `address` is only populated once a base has been resolved
 
 ```lua
 local meta = Nebula.CommunityEvent.meta("minRankToJoin")
@@ -105,7 +105,7 @@ print(meta.name, meta.type, meta.offset, meta.known)
 > **Offset verification status**: CommunityEvent's offsets have been
 > cross-referenced against the IL2CPP struct dump (`libcocos2dcpp.cs`).
 > The dump shows the game stores event definitions in
-> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `Dictionary<string, Pointer<EventDefinition>>`, the same
 > `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
 > PublicEvent, TeamEvent and CommunityEvent. All header offsets in
 > `metadata/CommunityEvent.lua` match exactly (`id` 0x8, `name` 0x20,

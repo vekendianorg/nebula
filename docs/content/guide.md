@@ -11,8 +11,8 @@ Nebula.PlayerInfo.get("gameStatus.coins")
 Nebula.PlayerInfo.set("gameStatus.coins", 999)
 ```
 
-The low-level memory work — pointer chasing, string encoding,
-anti-cheat checksum handling, array containers — is hidden behind a
+The low-level memory work, pointer chasing, string encoding,
+anti-cheat checksum handling, array containers, is hidden behind a
 small set of reusable type modules, driven entirely by metadata
 tables.
 
@@ -23,7 +23,7 @@ tables.
 - Pure Lua + GG API (no LuaJava)
 - Headless (no UI)
 - Metadata-driven
-- A guest in your script — Nebula loads into your host script
+- A guest in your script, Nebula loads into your host script
   without touching your globals (see
   [Embedding](#embedding-nebula-in-your-own-script))
 
@@ -47,7 +47,7 @@ encapsulation contract.
 ## Quickstart
 
 ```lua
--- 1. Load the SDK (packed build — see Install for both variants)
+-- 1. Load the SDK (packed build, see Install for both variants)
 local Nebula = dofile("/sdcard/nebula/nebula-1.0.0")
 
 -- 2. Read and write player save data through PlayerInfo
@@ -70,14 +70,14 @@ one memory layer. `gameStatus.*` paths reach the player's save
 
 Nebula can be loaded two ways: from a **local** copy of the packed
 file on your device, or fetched fresh over the network from **cloud**
-(GitHub) every time the script runs. Both end with the same thing —
+(GitHub) every time the script runs. Both end with the same thing -
 a `Nebula` table with every API surface wired onto it.
 
 ### Local
 
-1. Grab a packed build (see [Packing for release](#packing-for-release))
-   — either build one yourself with `python bundle.py -o
-   build/nebula-1.0.0` or download a prebuilt one from the repo's
+1. Grab a packed build (see [Packing for release](#packing-for-release)):
+   either build one yourself with `python bundle.py -o
+   build/nebula-1.0.0`, or download a prebuilt one from the repo's
    `build/` folder.
 2. Put it anywhere on your device GG can read, e.g.
    `/storage/sdcard0/nebula/nebula-1.0.0`.
@@ -89,15 +89,15 @@ local Nebula = dofile("/storage/sdcard0/nebula/nebula-1.0.0")
 Nebula.PlayerInfo.get("gameStatus.coins")
 ```
 
-Note the release artifacts in `build/` carry **no `.lua` extension** —
+Note the release artifacts in `build/` carry **no `.lua` extension** -
 just `nebula-1.0.0`. That's deliberate: `dofile()`/`loadfile()` don't
 care about extensions, and the cloud fetch (below) serves the exact
 same bytes, so local and cloud loading stay byte-identical. If the
 missing extension bothers you or your file manager, pass an explicit
-`-o build/nebula-1.0.0.lua` to the bundler — nothing about the
+`-o build/nebula-1.0.0.lua` to the bundler, nothing about the
 artifact changes otherwise.
 
-Local loading needs no network access and survives GG restarts — the
+Local loading needs no network access and survives GG restarts, the
 tradeoff is you're responsible for re-downloading a new packed build
 yourself whenever Nebula updates.
 
@@ -105,8 +105,8 @@ One note on `require()`: don't use it with a dotted file name. Lua
 treats dots in a module name as directory separators, so
 `require("nebula-1.0.0")` looks for `nebula-1/0/0.lua` and fails even
 though the file is right there. Load the packed build with `dofile()`
-(as above), or rename the artifact without dots — e.g.
-`nebula_1_0_0.lua` — if you prefer `require()`. Also remember
+(as above), or rename the artifact without dots, e.g.
+`nebula_1_0_0.lua`, if you prefer `require()`. Also remember
 `require()` caches modules in `package.loaded`: a re-require in the
 same session returns the stale first load, which is why `dofile()` is
 the recommended pattern for a per-session SDK.
@@ -124,7 +124,7 @@ Nebula.PlayerInfo.get("gameStatus.coins")
 
 Cloud loading always pulls the exact bytes at that URL, so pin to a
 specific tagged build path (like `nebula-1.0.0` above) rather than a
-`main`-tracking "latest" file if you want reproducible behavior —
+`main`-tracking "latest" file if you want reproducible behavior -
 swap the version segment in the URL when you want to move to a newer
 release. The tradeoff versus local is an extra network round-trip on
 every script run, and the script silently breaking if the URL ever
@@ -139,7 +139,7 @@ environment. Loading it will never clobber anything you own:
 
 - **One global, deliberately.** The only global Nebula ever writes
   is the exported `Nebula` table. No `scriptDir`, no `loadModule`,
-  no `__vfs` — your identically-named globals are neither read by
+  no `__vfs`, your identically-named globals are neither read by
   modules nor overwritten.
 - **Merge-tolerant export.** If a `Nebula` table already exists
   when you load the SDK, it is adopted as-is: your keys survive,
@@ -148,7 +148,7 @@ environment. Loading it will never clobber anything you own:
   `TeamEvent`, `CommunityEvent`, `Type`, `Memory`, `Cache`,
   `VERSION`).
 - **Read-honored config.** The config keys `log`, `verbose`,
-  `traceMem` (and `embed`, see below) are only set when absent —
+  `traceMem` (and `embed`, see below) are only set when absent -
   pre-set them before loading and your values win.
 - **Private module environment.** Modules see your globals
   (`gg`, `print`, `io`, ...) read-only through a passthrough, but
@@ -175,7 +175,7 @@ Nebula.PlayerInfo.get("gameStatus.coins")
 ```
 
 `src/test.lua` and `src/benchmark.lua` are written against this
-contract — use them as templates. The contract is enforced by
+contract, use them as templates. The contract is enforced by
 `test/encapsulation_spec.lua`.
 
 ---
@@ -243,20 +243,20 @@ nebula
    known field on the `PlayerInfo` struct: its byte offset, whether
    it's a repeated field, and which type it is. The right version
    folder is picked automatically from the running game's version by
-   **`metadata/manifest.lua`** — e.g. a game running `1.74.2`
+   **`metadata/manifest.lua`**, e.g. a game running `1.74.2`
    resolves the `1.74` folder. A new snapshot file is only added
    when the struct's layout actually changes.
 2. **`core/Type.lua`** is a registry mapping a type name (`"Int32"`,
    `"String"`, `"SafeInt32"`, ...) to the module implementing
    `get(base, field)` / `set(base, field, value)` for it.
 3. **`core/Memory.lua`** is the only file that talks to `gg.*`
-   directly — every read/write in Nebula goes through it. It also
+   directly, every read/write in Nebula goes through it. It also
    owns the (expensive) signature scan that locates the live
    `PlayerInfo` struct in memory, and optional verbose per-call
    timing (see [Logging](#logging)).
-4. **`core/Path.lua`** parses the dotted field id — indexing
+4. **`core/Path.lua`** parses the dotted field id, indexing
    (`vehicleStatus[1]`), child-struct descent (`gameStatus.coins`),
-   and repeated-element paths — and resolves it to a concrete
+   and repeated-element paths, and resolves it to a concrete
    address plus field metadata.
 5. **`core/Repeated.lua`** walks array/repeated-field containers,
    handling two container ABIs: protobuf `RepeatedField` (explicit
@@ -266,7 +266,7 @@ nebula
 6. **`core/Struct.lua`** reads/writes struct elements using a
    metadata template. It handles nested objects (pointer-backed
    containers), namespace containers, leaf fields, and Array fields
-   — batch-reading all array vector headers in a single
+  , batch-reading all array vector headers in a single
    `gg.getValues` call for performance. Empty arrays and zero-value
    scalars are suppressed from output for clean results.
 7. **`core/defineApi.lua`** ties it together for every `api/`
@@ -288,7 +288,7 @@ API call. `metadata/manifest.lua` resolves the running game's
 two-component version (e.g. `1.74`, from a game running `1.74.2`)
 to the closest version folder at or below it; if the game is older
 than every known folder, the oldest one is used rather than failing.
-Each version folder (`1.73`, `1.74`) is a COMPLETE snapshot — there
+Each version folder (`1.73`, `1.74`) is a COMPLETE snapshot, there
 are no runtime diff/merge chains. To cut a new version, copy the
 whole folder and edit only the structs/enums that actually changed.
 
@@ -318,14 +318,14 @@ sub-structs like `lootDefinition`), `Array` fields with `elements`
 arrays), and leaf fields.
 
 Two container ABIs are supported:
-- **protobuf `RepeatedField`**: `{arrayPtr:INT64, size:INT32, capacity:INT32}` — used by GameStatus achievements
-- **C++ `std::vector`**: `{begin:INT64, end:INT64, capEnd:INT64}` — size = `(end-begin)/stride` — used by PublicEvent/TeamEvent arrays
+- **protobuf `RepeatedField`**: `{arrayPtr:INT64, size:INT32, capacity:INT32}`, used by GameStatus achievements
+- **C++ `std::vector`**: `{begin:INT64, end:INT64, capEnd:INT64}`, size = `(end-begin)/stride`, used by PublicEvent/TeamEvent arrays
 
 ## Usage
 
 ### PlayerInfo
 
-`PlayerInfo` is the parent object of the player's save data — the
+`PlayerInfo` is the parent object of the player's save data, the
 struct the base scan actually lands on. The save itself
 (`GameStatus`) is PlayerInfo's child struct (`mGameStatus` @0x148)
 and every save field is reachable as a dotted path:
@@ -354,7 +354,7 @@ Nebula.PlayerInfo.set(
     "gameStatus.vehicleStatus[1].tuningPartPresets[1].equippedParts[1]",
     "new_part")
 
--- Write a whole element struct (partial keys allowed — only the
+-- Write a whole element struct (partial keys allowed, only the
 -- provided keys are written, sibling fields stay intact)
 Nebula.PlayerInfo.set("gameStatus.achievements[1]", { steps = 5 })
 
@@ -388,14 +388,14 @@ for i, achievement in ipairs(achievements) do
 end
 ```
 
-`set()` executes immediately — the returned object is only needed if
+`set()` executes immediately, the returned object is only needed if
 you want to call `:dry()` (validate everything except the actual
 memory write) or `:verify()` (read the value back and compare it
 against what was written) explicitly. Check `op._ok` / `op._err`
 for the outcome, `op._verified` / `op._actual` after `:verify()`.
 
 `get()` with no id returns an accessor bound to the currently
-resolved base address — read several fields without re-resolving:
+resolved base address, read several fields without re-resolving:
 
 ```lua
 local pi = Nebula.PlayerInfo.get()
@@ -404,13 +404,13 @@ if pi then
 end
 ```
 
-Full reference: `content/api/playerinfo.md` — `get`, bound `get()`,
+Full reference: `content/api/playerinfo.md`, `get`, bound `get()`,
 `set` (with `:dry()`/`:verify()`), `fields`, `meta`.
 
 ### GameData
 
 Unlike PlayerInfo (the player's save), `GameData` is the game's
-global configuration singleton — exactly one per running game. The
+global configuration singleton, exactly one per running game. The
 base is found via AOB byte-signature scanning (first validated
 candidate wins, cached for subsequent calls).
 
@@ -421,7 +421,7 @@ Nebula.GameData.get("maxVisibleRange")
 -- Struct-element arrays support indexed dotted paths
 Nebula.GameData.get("leagueDefinitions[1].title")
 
--- Bound accessor — resolve the base once, then read many fields
+-- Bound accessor, resolve the base once, then read many fields
 local gd = Nebula.GameData.get()
 if gd then
     print(gd.get("minVisibleRange"), gd.get("maxVisibleRange"))
@@ -434,11 +434,11 @@ Nebula.GameData.get("tutorialRubberbandingType") -- "Static" | "Dynamic" | "Only
 -- for every system that reads it, not just the local player
 Nebula.GameData.set("tutorialRubberbandingType", "Dynamic")
 
--- Same chainable ops as PlayerInfo — element-struct writes included
+-- Same chainable ops as PlayerInfo, element-struct writes included
 Nebula.GameData.set("leagueDefinitions[1]", { title = "Pro League" }):verify()
 ```
 
-Full reference: `content/api/gamedata.md` — `get`, bound `get()`,
+Full reference: `content/api/gamedata.md`, `get`, bound `get()`,
 `set`, `fields`, `meta`.
 
 ### PublicEvent / TeamEvent / CommunityEvent
@@ -451,7 +451,7 @@ Nebula.TeamEvent.get("sessionEntry.entryFeeTickets")
 Nebula.CommunityEvent.get("minRankToJoin")
 
 -- get() with no id returns an event accessor bound to the
--- currently-active struct's base address — read multiple fields off
+-- currently-active struct's base address, read multiple fields off
 -- that exact snapshot instead of re-resolving per call
 local TeamEvent = Nebula.TeamEvent.get()
 TeamEvent.get("minTeamSizeToJoin")
@@ -477,7 +477,7 @@ print(meta.name, meta.type, meta.offset, meta.known)
 
 `Nebula.TeamEvent.get()` (and `PublicEvent`, `CommunityEvent`) with
 no id resolves the base immediately and hands back an object bound
-to that specific struct address — the plain `get(id)` form
+to that specific struct address, the plain `get(id)` form
 re-resolves (from cache) on every call instead. Both end up calling
 the same underlying reader, so pick whichever reads better for the
 call site: one field → the plain form; several fields off the same
@@ -515,7 +515,7 @@ GG value-type flags used throughout Nebula (`core/Memory.lua`
 | `Enum` | Int32 ↔ string enum, decodes to names on read (chest types, etc.) |
 | `Color3B` / `Vec2` | packed multi-word small structs |
 | `Object` | pointer-backed sub-struct (namespace containers, nested objects) |
-| `Array` | typed or struct-array container — see [Repeated / array fields](#repeated--array-fields) |
+| `Array` | typed or struct-array container, see [Repeated / array fields](#repeated--array-fields) |
 
 ### String encoding
 
@@ -551,7 +551,7 @@ structPtr + 0x24  keyChecksum
 
 Values are XOR-encoded against a single account-wide static key
 (`gameStatus.safeIntStaticKey`, offset `0x6AC`), resolved internally
-by `core/types/SafeInt32.lua` — individual fields don't declare it.
+by `core/types/SafeInt32.lua`, individual fields don't declare it.
 
 ### BitMask
 
@@ -586,7 +586,7 @@ base + field.offset = ptr        -- this address IS the container header
 ptr + 0x0   arrayPtr   (int64, pointer to backing array)
 ptr + 0x8   size       (int32, live element count)
 ptr + 0xC   capacity   (int32, allocated slot count)
-ptr + 0x10  allocSlots (int32, next-pow2 of size — derived, not authoritative)
+ptr + 0x10  allocSlots (int32, next-pow2 of size, derived, not authoritative)
 ```
 
 Element slots sit 8 bytes apart starting at `arrayPtr`. For
@@ -594,7 +594,7 @@ message/custom element types (anything that isn't a known inline
 scalar), each slot holds a **pointer** to the element's own struct.
 
 `size`/`capacity` are sanity-bounded before being trusted (rejected
-if negative, over a fixed ceiling, or `size > capacity`) — a
+if negative, over a fixed ceiling, or `size > capacity`), a
 misread/garbage header fails cleanly with a descriptive error instead
 of driving a runaway loop or table allocation.
 
@@ -603,7 +603,7 @@ field reads into one cross-element `gg.getValues` call instead of one
 call per element.
 
 `Repeated.set()` writes into existing slots; growing a container
-allocates elements from `core/ZeroPage.lua`'s scratch page — a write
+allocates elements from `core/ZeroPage.lua`'s scratch page, a write
 larger than `capacity` fails cleanly with `capacity_exceeded` rather
 than attempting anything unsafe.
 
@@ -625,7 +625,7 @@ struct by:
 3. Validating a version marker at `ptr + 0x10` against a known set
    of values.
 4. The PlayerInfo base is `ptr - 0xC8`. The `GameStatus` save struct
-   is its child at `base + 0x148` — which is why every save field
+   is its child at `base + 0x148`, which is why every save field
    is a `gameStatus.*` dotted path.
 
 `api/PlayerInfo.lua` (via `defineApi`) caches the result for the
@@ -649,7 +649,7 @@ String-search resolution instead of AOB: searches for the ASCII
 bytes of `"community Showcase\0"`, refines by first byte (`0x24`),
 then validates each hit by checking the vtable marker `0x6D6F631E`
 at `hit - 0x18`. Struct base = `hit - 0x20`. Same cache integration
-as PublicEvent/TeamEvent — the string scan always runs, and cached
+as PublicEvent/TeamEvent, the string scan always runs, and cached
 addresses passing vtable validation are kept. Unlike the other event
 modules, CommunityEvent validation uses the vtable marker rather
 than timestamp fields.
@@ -659,7 +659,7 @@ than timestamp fields.
 ## Logging
 
 Three independent, opt-in switches (all default `false`, all
-read-honored — see
+read-honored, see
 [Embedding](#embedding-nebula-in-your-own-script)):
 
 ```lua
@@ -668,18 +668,18 @@ Nebula.verbose  = true  -- per-call gg.getValues/setValues timing
 Nebula.traceMem = true  -- raw per-address memory-I/O dump (noisy)
 ```
 
-- **`Nebula.log`** — one line per API operation: the dotted path,
+- **`Nebula.log`**, one line per API operation: the dotted path,
   resolved address, decoded value, and failures:
   `[PlayerInfo] [get] PATH=gameStatus.coins ADDR=0x7A00000100 -> 999`
-- **`Nebula.verbose`** — timing for every single `gg.*` round-trip:
-  `[Nebula.Memory] readBatch    count=36   4.00ms` — useful for
+- **`Nebula.verbose`**, timing for every single `gg.*` round-trip:
+  `[Nebula.Memory] readBatch    count=36   4.00ms`, useful for
   tracking down slowness.
-- **`Nebula.traceMem`** — every raw address read or written with its
+- **`Nebula.traceMem`**, every raw address read or written with its
   value, cross-checkable directly in GG's memory viewer:
   `[Memory] [write] addr=0x7A00000108 flags=4/INT32 <- 42`
 
 While `Nebula.log` is on, all diagnostics go to `nebula.log` next to
-the script instead of the console — written and flushed line by line
+the script instead of the console, written and flushed line by line
 (`core/Logfile.lua`), so the full trace survives a crash. If the
 file can't be opened, lines fall back to `print`. An explicit
 `Logfile.setPath(path)` overrides the default sink for the session.
@@ -699,14 +699,14 @@ lua test/encapsulation_spec.lua     #  39 checks: host-script contract
 ```
 
 The encapsulation spec additionally exercises the **packed**
-artifact — build it first:
+artifact, build it first:
 
 ```
 python3 bundle.py -o /tmp/nebula_enc_packed.lua
 ```
 
 Every check is a mock-driven, byte-addressable simulation of the GG
-memory API — no device needed. If you change metadata, a type module,
+memory API, no device needed. If you change metadata, a type module,
 or the loader, rerun all three.
 
 ---
@@ -721,12 +721,12 @@ python bundle.py -v 1.0.0        # inject version string
 ```
 
 Release artifacts follow the `nebula-<version>` convention with **no
-`.lua` extension** — see the note under [Local](#local).
+`.lua` extension**, see the note under [Local](#local).
 
 The bundler walks `src/`, embeds every module's SOURCE into a
 private `__vfs` table (compiled lazily inside the module
 environment), strips `main.lua`'s encapsulated loader block, and
-replaces it with a VFS-aware prologue — so the exact same
+replaces it with a VFS-aware prologue, so the exact same
 `loadModule("core/...")` calls used in dev mode keep working
 unchanged in the packed output. This is what makes both
 [local](#local) and [cloud](#cloud) loading work from a single
@@ -750,8 +750,8 @@ only global write is the exported `Nebula` table.
 - [x] Extract every inline element template into its own per-class
       versioned snapshot under `metadata/<version>/structs/<Class>.lua`,
       cross-verified against the IL2CPP dump
-- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) —
+- [x] Fill in remaining unknown offsets (`0xBAAD` placeholders) -
       all offsets verified against the dump
 - [x] Host-script encapsulation contract (single exported global,
-      private module environment, embed-mode failures) — enforced by
+      private module environment, embed-mode failures), enforced by
       `test/encapsulation_spec.lua`

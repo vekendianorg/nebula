@@ -1,9 +1,9 @@
 ## TeamEvent
 
 Read and write fields off whichever `TeamEvent` struct is
-currently active in memory. Same surface as `PublicEvent` —
+currently active in memory. Same surface as `PublicEvent` -
 `get(fieldName)`, `get()`, `set(fieldName, value)`, `fields()`,
-`meta(fieldName)` — bound to the same shared
+`meta(fieldName)`, bound to the same shared
 `metadata/<version>/structs/EventDefinition.lua` struct as
 `PublicEvent` and `CommunityEvent` (see
 [Versioned metadata](#versioned-metadata)), including its
@@ -18,11 +18,11 @@ address on first use.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"minTeamSizeToJoin"` or `"sessionEntry.entryFeeTickets"`
+- `fieldName` (string), the field's dotted name as declared in `metadata/<version>/structs/EventDefinition.lua`, e.g. `"minTeamSizeToJoin"` or `"sessionEntry.entryFeeTickets"`
 
 **Returns**
 
-(number | string | table) — the field's current value, typed according to its metadata entry
+(number | string | table), the field's current value, typed according to its metadata entry
 
 ```lua
 local minSize = Nebula.TeamEvent.get("minTeamSizeToJoin")
@@ -38,7 +38,7 @@ step is needed to trigger resolution.
 
 **Returns**
 
-(table) — an object with a `get(fieldName)` field, or `nil` plus an error string if no team event is currently active
+(table), an object with a `get(fieldName)` field, or `nil` plus an error string if no team event is currently active
 
 ```lua
 local TeamEvent = Nebula.TeamEvent.get()
@@ -53,12 +53,12 @@ Returns a chainable operation object supporting `:dry()`.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
-- `value` (number | string | table) — the value to write
+- `fieldName` (string), the field's dotted name
+- `value` (number | string | table), the value to write
 
 **Returns**
 
-(table) — a chainable operation object; already executed
+(table), a chainable operation object; already executed
 
 ```lua
 Nebula.TeamEvent.set("startTime", 1700000000)
@@ -68,11 +68,11 @@ Nebula.TeamEvent.set("startTime", 1700000000):dry()
 ### TeamEvent.fields()
 
 Lists every field's dotted id that has a verified (non-placeholder)
-offset — same rules as `PublicEvent.fields()`.
+offset, same rules as `PublicEvent.fields()`.
 
 **Returns**
 
-(table) — a sorted array of dotted field-name strings
+(table), a sorted array of dotted field-name strings
 
 ```lua
 for _, id in ipairs(Nebula.TeamEvent.fields()) do
@@ -87,11 +87,11 @@ value.
 
 **Parameters**
 
-- `fieldName` (string) — the field's dotted name
+- `fieldName` (string), the field's dotted name
 
 **Returns**
 
-(table) — `{ name, type, offset, repeated, known, address }` — `address` is only populated once a base has been resolved
+(table), `{ name, type, offset, repeated, known, address }`, `address` is only populated once a base has been resolved
 
 ```lua
 local meta = Nebula.TeamEvent.meta("minTeamSizeToJoin")
@@ -103,7 +103,7 @@ print(meta.name, meta.type, meta.offset, meta.known)
 > as PublicEvent, which has been fully cross-referenced
 > against the IL2CPP struct dump (`libcocos2dcpp.cs`). The dump shows
 > team event definitions are stored in
-> `Dictionary<string, Pointer<EventDefinition>>` — the same
+> `Dictionary<string, Pointer<EventDefinition>>`, the same
 > `EventDefinition` struct (Size 0x5D8, Confidence: exact) backs
 > PublicEvent, TeamEvent and CommunityEvent. TeamEvent's unique tail
 > fields are confirmed: `multiRaceGameModes` at `0x500` and

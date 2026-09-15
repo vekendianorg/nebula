@@ -1,5 +1,5 @@
 <!--
-  API reference for the PlayerInfo module — the parent object of the
+  API reference for the PlayerInfo module, the parent object of the
   player's save data. Every function lives in its own ### heading;
   the build script parses these into the "API Reference" section of
   docs.html and the search index automatically.
@@ -12,11 +12,11 @@
 
     **Parameters**
 
-    - `paramName` (type) — description
+    - `paramName` (type), description
 
     **Returns**
 
-    (type) — description
+    (type), description
 
     ```lua
     -- one or more short usage examples
@@ -29,7 +29,7 @@
 
 ## PlayerInfo
 
-The player's save-data parent object — the struct the
+The player's save-data parent object, the struct the
 `"startup_count"` signature scan actually lands on. There is no
 separate GameStatus module: the save struct is PlayerInfo's child
 (`mGameStatus` @0x148), and every save field is reachable as a
@@ -50,11 +50,11 @@ metadata](#versioned-metadata) section): child structs descend with
 
 **Parameters**
 
-- `fieldId` (string) — dotted field path, e.g. `"startupCount"`, `"gameStatus.coins"`, `"gameStatus.achievements[1]"`
+- `fieldId` (string), dotted field path, e.g. `"startupCount"`, `"gameStatus.coins"`, `"gameStatus.achievements[1]"`
 
 **Returns**
 
-(number | string | boolean | table) — the field's current value, typed according to its metadata entry; BitMask fields return a boxed table (see `:has()`/`:enable()`), repeated fields return a plain Lua array of decoded elements
+(number | string | boolean | table), the field's current value, typed according to its metadata entry; BitMask fields return a boxed table (see `:has()`/`:enable()`), repeated fields return a plain Lua array of decoded elements
 
 ```lua
 local coins  = Nebula.PlayerInfo.get("gameStatus.coins")
@@ -67,11 +67,11 @@ local status = Nebula.PlayerInfo.get("startupStatus")    -- Enum -> string name
 
 With no argument, resolves the base address once (the scan result is
 cached for the session) and returns an accessor bound to that exact
-struct address — read many fields without re-resolving per call.
+struct address, read many fields without re-resolving per call.
 
 **Returns**
 
-(table | nil) — accessor with a `.base` address and a `.get(fieldId)` method, or nil if the base could not be resolved
+(table | nil), accessor with a `.base` address and a `.get(fieldId)` method, or nil if the base could not be resolved
 
 ```lua
 local pi = Nebula.PlayerInfo.get()
@@ -83,13 +83,13 @@ end
 ### PlayerInfo.set(fieldId, value)
 
 Writes a single field by dotted path. Returns a chainable operation
-object supporting `:dry()` and `:verify()` — calling `set()` alone
+object supporting `:dry()` and `:verify()`, calling `set()` alone
 executes the write immediately, and the returned object is only
 needed when you want one of those modifiers explicitly.
 
 Indexed element paths (`"gameStatus.achievements[1]"`) accept a
 **table value to write the whole element struct**: only the keys you
-provide are written — sibling fields stay intact, the existing
+provide are written, sibling fields stay intact, the existing
 instance is edited in place (never re-allocated), and unknown keys
 are a safe no-op. A non-table value for an element path is rejected
 with `value_not_table`; a null element pointer with
@@ -97,19 +97,19 @@ with `value_not_table`; a null element pointer with
 
 `:dry()` validates the path and value without touching memory.
 `:verify()` reads the value back through the same path and compares
-it against what the operation wrote — tables compare recursively
+it against what the operation wrote, tables compare recursively
 over the expected keys only (so partial element writes verify
 cleanly), numbers with a small float32 tolerance. The result lands
 on `op._verified` / `op._actual`.
 
 **Parameters**
 
-- `fieldId` (string) — dotted field path, as for `get()`
-- `value` (number | string | boolean | table) — the new value; must match the field's declared type; element paths take a partial struct table
+- `fieldId` (string), dotted field path, as for `get()`
+- `value` (number | string | boolean | table), the new value; must match the field's declared type; element paths take a partial struct table
 
 **Returns**
 
-(table) — a chainable operation object; already executed. Check `op._ok`/`op._err` for the outcome, `op._verified`/`op._actual` after `:verify()`.
+(table), a chainable operation object; already executed. Check `op._ok`/`op._err` for the outcome, `op._verified`/`op._actual` after `:verify()`.
 
 ```lua
 Nebula.PlayerInfo.set("gameStatus.coins", 999)
@@ -132,13 +132,13 @@ end
 ### PlayerInfo.fields()
 
 Lists every offset-verified field id the resolved struct metadata
-defines — every dotted path that is safe to pass to `get()` /
+defines, every dotted path that is safe to pass to `get()` /
 `set()`. Fields whose offsets are still `0xBAAD` placeholders are
 excluded.
 
 **Returns**
 
-(string[]) — sorted dotted field ids
+(string[]), sorted dotted field ids
 
 ```lua
 for _, id in ipairs(Nebula.PlayerInfo.fields()) do
@@ -152,11 +152,11 @@ Introspects a field without reading its value.
 
 **Parameters**
 
-- `fieldId` (string) — dotted field path
+- `fieldId` (string), dotted field path
 
 **Returns**
 
-(table | nil) — `{ name, type, offset, repeated, known, ... }`; `known` is false while the offset is still a `0xBAAD` placeholder
+(table | nil), `{ name, type, offset, repeated, known, ... }`; `known` is false while the offset is still a `0xBAAD` placeholder
 
 ```lua
 local meta = Nebula.PlayerInfo.meta("gameStatus.coins")
