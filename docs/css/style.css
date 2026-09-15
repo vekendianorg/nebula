@@ -305,8 +305,13 @@ html.fit-clamped, html.fit-clamped body { overflow-x: hidden !important; }
     flex-shrink: 0;
     max-height: calc(100vh - var(--nav-h) - 3rem);
     overflow-y: auto;
+    overflow-x: hidden;     /* explicit: paired with overflow-y so it's not
+                             * silently forced by the browser (see padding-left) */
     border-right: 1px solid var(--border);
     padding-right: 1.25rem;
+    padding-left: 0.65rem;  /* room for .toc-link's -0.65rem hover-bar trick;
+                             * without it the negative margin got clipped,
+                             * eating the first letter of every top-level entry */
 }
 
 .doc-sidebar-title {
