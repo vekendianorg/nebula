@@ -6,7 +6,7 @@
 -- version resolves to this file). One class definition per file —
 -- this file is RaceInfo only.
 --
--- Dump source (temp/libcocos2dcpp.cs, 1.73 dump):
+-- Dump source (libcocos2dcpp.cs, 1.73 dump):
 --   public class RaceInfo // TypeDefIndex: 1836 Size: 0x3A0
 --   Confidence: exact
 --
@@ -31,7 +31,7 @@
 -- not guessed; see header notes in the cited files):
 --   - _vptr_RaceInfo @0x0 (vptr)
 --   - raceReplays Pointer<List<Pointer<Replay>>> @0x8 (Pointer<List>
---     ABI unverified; Replay has no metadata snapshot)
+--     ABI unverified)
 --   - onStateChanged FSEvent<RaceInfoState> @0x20, onRaceStarted
 --     FSEvent @0x50, mPlayerNameApprovalHandler
 --     FSEvent<PlayerNameApprovalState> @0x388 (inline FSEvent Size
@@ -51,19 +51,6 @@
 --     mCupRaceFinishSeasonRanks List<float> @0x368 (IL2CPP List<T>
 --     header ABI unverified for these owners — not mapped as Array
 --     to avoid guessing container/stride)
---   - specialEvent SpecialEventDefinition @0x200, bossDriver
---     BossDriverDefinition @0x208, mLevelDefinition LevelDefinition
---     @0x238, mPreviousLevel LevelDefinition @0x240, mWorldDefinition
---     WorldDefinition @0x248, mRaceEventStatus
---     Pointer<RaceEventStatus> @0x270, mRaceEventDefinition
---     RaceEventDefinition @0x280, mEventSessionStatus
---     Pointer<EventSessionStatus> @0x288, mChallenge Pointer<Challenge>
---     @0x2A8, mDivisionStatus Pointer<DivisionStatus> @0x2F8,
---     mWcRace Pointer<WCRace> @0x310, mGhostCups
---     Pointer<List<Pointer<Cup>>> @0x320, mCurrentCup Pointer<Cup>
---     @0x330, mCurrentCupReplays Pointer<List<Pointer<Replay>>>
---     @0x340 (targets have no verified metadata snapshots; not
---     created here — one class per file, no transitive explosion)
 --   - mFetchHandle AsyncHandle @0x2EC, mPlayerGarageFetchHandle
 --     AsyncHandle @0x2F0, mStoreWcRaceHandle AsyncHandle @0x308
 --     (AsyncHandle has no class/struct definition in the dump —
@@ -73,12 +60,31 @@
 -- (mLeagueDefinition @0x230), EventDefinition (mEventDefinition
 -- @0x298), VehicleStatus (mVehicleStatus @0x390); enums RaceInfoState,
 -- WinStreakShieldType, GameMode, eRaceType.
+--
+-- NEW in this version: all previously-omitted struct/Pointer fields
+-- now have metadata snapshots and are mapped as Object fields.
+-- Proto2 types (RaceEventStatus, EventSessionStatus, Challenge,
+-- DivisionStatus, WCRace, Cup, Reply) carry `stringDirect = false`
+-- so their strings decode as pointer-backed (indirect).
 
 local Manifest = loadModule("metadata/manifest.lua")
 
-local LeagueDefinition = Manifest.load("LeagueDefinition")
-local EventDefinition  = Manifest.load("EventDefinition")
-local VehicleStatus    = Manifest.load("VehicleStatus")
+local LeagueDefinition     = Manifest.load("LeagueDefinition")
+local EventDefinition      = Manifest.load("EventDefinition")
+local VehicleStatus        = Manifest.load("VehicleStatus")
+local SpecialEventDefinition = Manifest.load("SpecialEventDefinition")
+local BossDriverDefinition = Manifest.load("BossDriverDefinition")
+local LevelDefinition      = Manifest.load("LevelDefinition")
+local WorldDefinition      = Manifest.load("WorldDefinition")
+local RaceEventStatus      = Manifest.load("RaceEventStatus")
+local RaceEventDefinition  = Manifest.load("RaceEventDefinition")
+local EventSessionStatus   = Manifest.load("EventSessionStatus")
+local Challenge            = Manifest.load("Challenge")
+local DivisionStatus       = Manifest.load("DivisionStatus")
+local WCRace               = Manifest.load("WCRace")
+local Cup                  = Manifest.load("Cup")
+local Replay               = Manifest.load("Replay")
+local VehicleRecord        = Manifest.load("VehicleRecord")
 
 return {
     ["raceInfoState"] = {
@@ -86,6 +92,16 @@ return {
         offset = 0x18,
         type = "Enum",
         enum = "RaceInfoState"
+    },
+    ["raceReplays"] = {
+        -- dump: public Pointer<List<Pointer<Replay>>> raceReplays // 0x8
+        offset = 0x8,
+        type = "Array",
+        elementType = "Object",
+        elements = Replay,
+        elementStride = 0x8,
+        container = "vector",
+        stringDirect = false,
     },
     ["coinsBeforeRace"] = {
         offset = 0x98,
@@ -217,6 +233,15 @@ return {
         offset = 0x160,
         type = "Float"
     },
+    ["vehicleSpecificRecords"] = {
+        -- dump: public List<VehicleRecord> vehicleSpecificRecords // 0x168
+        offset = 0x168,
+        type = "Array",
+        elementType = "Object",
+        elements = VehicleRecord,
+        elementStride = 0x20,  -- List<VehicleRecord>: inline value element, sizeof(VehicleRecord) = 0x20
+        container = "vector",
+    },
     ["collectedDistanceCollectibleAmount"] = {
         offset = 0x180,
         type = "Int32"
@@ -288,6 +313,18 @@ return {
         type = "Enum",
         enum = "WinStreakShieldType"
     },
+    ["specialEvent"] = {
+        -- dump: public SpecialEventDefinition specialEvent // 0x200
+        offset = 0x200,
+        type = "Object",
+        elements = SpecialEventDefinition,
+    },
+    ["bossDriver"] = {
+        -- dump: public BossDriverDefinition bossDriver // 0x208
+        offset = 0x208,
+        type = "Object",
+        elements = BossDriverDefinition,
+    },
     ["seed"] = {
         -- dump: private int mSeed // 0x210
         offset = 0x210,
@@ -306,6 +343,24 @@ return {
         type = "Object",
         elements = LeagueDefinition
     },
+    ["levelDefinition"] = {
+        -- dump: private LevelDefinition mLevelDefinition // 0x238
+        offset = 0x238,
+        type = "Object",
+        elements = LevelDefinition,
+    },
+    ["previousLevel"] = {
+        -- dump: private LevelDefinition mPreviousLevel // 0x240
+        offset = 0x240,
+        type = "Object",
+        elements = LevelDefinition,
+    },
+    ["worldDefinition"] = {
+        -- dump: private WorldDefinition mWorldDefinition // 0x248
+        offset = 0x248,
+        type = "Object",
+        elements = WorldDefinition,
+    },
     ["vehicleId"] = {
         -- dump: private string mVehicleId // 0x250
         offset = 0x250,
@@ -318,11 +373,41 @@ return {
         type = "Enum",
         enum = "GameMode"
     },
+    ["raceEventStatus"] = {
+        -- dump: private Pointer<RaceEventStatus> mRaceEventStatus // 0x270
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x270,
+        type = "Object",
+        elements = RaceEventStatus,
+        stringDirect = false,
+    },
+    ["raceEventDefinition"] = {
+        -- dump: private RaceEventDefinition mRaceEventDefinition // 0x280
+        offset = 0x280,
+        type = "Object",
+        elements = RaceEventDefinition,
+    },
+    ["eventSessionStatus"] = {
+        -- dump: private Pointer<EventSessionStatus> mEventSessionStatus // 0x288
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x288,
+        type = "Object",
+        elements = EventSessionStatus,
+        stringDirect = false,
+    },
     ["eventDefinition"] = {
         -- dump: private Pointer<EventDefinition> mEventDefinition // 0x298
         offset = 0x298,
         type = "Object",
         elements = EventDefinition
+    },
+    ["challenge"] = {
+        -- dump: private Pointer<Challenge> mChallenge // 0x2A8
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x2A8,
+        type = "Object",
+        elements = Challenge,
+        stringDirect = false,
     },
     ["friendlyRaceId"] = {
         -- dump: private string mFriendlyRaceId // 0x2B8
@@ -338,6 +423,52 @@ return {
         -- dump: private int mTournamentRaceIndex // 0x2E8
         offset = 0x2E8,
         type = "Int32"
+    },
+    ["divisionStatus"] = {
+        -- dump: private Pointer<DivisionStatus> mDivisionStatus // 0x2F8
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x2F8,
+        type = "Object",
+        elements = DivisionStatus,
+        stringDirect = false,
+    },
+    ["wcRace"] = {
+        -- dump: private Pointer<WCRace> mWcRace // 0x310
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x310,
+        type = "Object",
+        elements = WCRace,
+        stringDirect = false,
+    },
+    ["ghostCups"] = {
+        -- dump: private Pointer<List<Pointer<Cup>>> mGhostCups // 0x320
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x320,
+        type = "Array",
+        elementType = "Object",
+        elements = Cup,
+        elementStride = 0x8,
+        container = "vector",
+        stringDirect = false,
+    },
+    ["currentCup"] = {
+        -- dump: private Pointer<Cup> mCurrentCup // 0x330
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x330,
+        type = "Object",
+        elements = Cup,
+        stringDirect = false,
+    },
+    ["currentCupReplays"] = {
+        -- dump: private Pointer<List<Pointer<Replay>>> mCurrentCupReplays // 0x340
+        -- proto2 Message — strings are pointer-backed (indirect).
+        offset = 0x340,
+        type = "Array",
+        elementType = "Object",
+        elements = Replay,
+        elementStride = 0x8,
+        container = "vector",
+        stringDirect = false,
     },
     ["sendFullReplays"] = {
         -- dump: private bool mSendFullReplays // 0x380

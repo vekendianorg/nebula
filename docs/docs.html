@@ -88,20 +88,6 @@ tables.</p>
   without touching your globals (see
   <a href="#embedding-nebula-in-your-own-script">Embedding</a>)</li>
 </ul>
-<h2 id="status">Status</h2>
-<p><strong>v1.0.0.</strong> Base address resolution, scalar types, bitmasks,
-repeated/array fields, nested objects, inline struct arrays, and four
-API surfaces (<code>PlayerInfo</code>, <code>GameData</code>, <code>PublicEvent</code>, <code>TeamEvent</code>,
-<code>CommunityEvent</code>) are working and tested. The <code>lootDefinition</code>
-sub-struct with all 14 nested array fields is fully readable,
-including object arrays with inline C++ struct elements. Chest type
-enums (Int32 ↔ string) are handled bidirectionally for both get and
-set. Metadata is shipped as complete snapshots for game versions
-<strong>1.73</strong> and <strong>1.74</strong> (107 struct files and 752 enum tables per
-version). All of it is enforced by a 300-check spec suite covering
-the API, the array/trace machinery, and the host-script
-encapsulation contract.</p>
-<hr />
 <h2 id="quickstart">Quickstart</h2>
 <div class="hl" data-lang="lua"><pre><span></span><code><span class="c1">-- 1. Load the SDK (packed build, see Install for both variants)</span>
 <span class="kd">local</span><span class="w"> </span><span class="nv">Nebula</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">dofile</span><span class="p">(</span><span class="s2">"/sdcard/nebula/nebula-1.0.0"</span><span class="p">)</span>

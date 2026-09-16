@@ -22,9 +22,5 @@ if not ok then gg.alert(tostring(err)) return end
 -- scratch tests
 --==================================================
 
-local name = "NebulaSDK"
-local playerName = Nebula.PlayerInfo.get("gameStatus.playerName")
-print("before", playerName)
-Nebula.PlayerInfo.set("gameStatus.playerName", name)
-local newPlayerName = Nebula.PlayerInfo.get("gameStatus.playerName")
-print("after", newPlayerName)
+local t = Nebula.PlayerInfo.get("currentRace")
+print(t)

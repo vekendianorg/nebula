@@ -35,21 +35,6 @@ this README is the same content in repo form. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the code style and conventions;
 [LICENSE](LICENSE) covers distribution.
 
-## Status
-
-**v1.0.0.** Base address resolution, scalar types, bitmasks,
-repeated/array fields, nested objects, inline struct arrays, and four
-API surfaces (`PlayerInfo`, `GameData`, `PublicEvent`, `TeamEvent`,
-`CommunityEvent`) are working and tested. The `lootDefinition`
-sub-struct with all 14 nested array fields is fully readable,
-including object arrays with inline C++ struct elements. Chest type
-enums (Int32 ↔ string) are handled bidirectionally for both get and
-set. Metadata is shipped as complete snapshots for game versions
-**1.73** and **1.74** (107 struct files and 752 enum tables per
-version). All of it is enforced by a 300-check spec suite covering
-the API, the array/trace machinery, and the host-script
-encapsulation contract.
-
 ---
 
 ## Quickstart

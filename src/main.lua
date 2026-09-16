@@ -161,6 +161,6 @@ Nebula.Memory = loadModule("core/Memory.lua")
 -- across signature modifications.
 Nebula.Cache   = loadModule("core/Cache.lua")
 
-Nebula.VERSION = "1.0.0"
+Nebula.VERSION = "1.0.1"
 
 return Nebula
