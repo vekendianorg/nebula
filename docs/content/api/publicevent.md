@@ -69,6 +69,39 @@ Nebula.PublicEvent.set("startTime", 1700000000)
 Nebula.PublicEvent.set("startTime", 1700000000):dry()
 ```
 
+### Reward editing (`eventRewards`)
+
+`eventRewards` (and the sibling reward arrays `eventSpecials`,
+`rotatingEventRewards`, `mainEventRewards`, `premiumEventRewards`) are
+repeated `ConditionalRewardDefinition` elements and are fully
+navigable and writable through the normal dotted-path interface:
+
+```lua
+Nebula.PublicEvent.get("eventRewards")                          -- all reward tiers
+Nebula.PublicEvent.get("eventRewards[1]")                       -- one element struct
+Nebula.PublicEvent.get("eventRewards[1].lootDefinition.coinAmount")
+Nebula.PublicEvent.set("eventRewards[1].maxCollectAmount", 999)
+Nebula.PublicEvent.set("eventRewards[1]", { maxCollectAmount = 555 })  -- edit-in-place, partial
+Nebula.PublicEvent.set("eventRewards", list)                    -- whole-array rewrite (or grow)
+```
+
+In the memory ABI `rewardCondition` **is** the float `criteria`
+member — not the serialized `{criteria, type}` object.
+
+`Nebula.PublicEvent.rewards` carries the full reward-name reference
+payload (`src/data/rewards.lua`, generated from `extra/rewards.lua`):
+all 96 reward tiers with every reward name, pre-flattened to the
+memory ABI so it can be written directly:
+
+```lua
+Nebula.PublicEvent.set("eventRewards", Nebula.PublicEvent.rewards)
+```
+
+The same table is valid for `Nebula.TeamEvent` and
+`Nebula.CommunityEvent` — they share the identical `EventDefinition`
+reward arrays.
+
+
 ### PublicEvent.fields()
 
 Lists every field's dotted id that has a verified (non-placeholder)

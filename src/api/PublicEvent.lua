@@ -18,17 +18,33 @@
 --   Nebula.PublicEvent.get("startTime")
 --   Nebula.PublicEvent.get("gameMode.duration")
 --   Nebula.PublicEvent.get("eventRewards")
+--   Nebula.PublicEvent.get("eventRewards[1]")
+--   Nebula.PublicEvent.get("eventRewards[1].lootDefinition.coinAmount")
 --
 --   local event = Nebula.PublicEvent.get()
 --   event.get("minTeamSizeToJoin")
 --   event.get("sessionEntry.numberOfParallelSessions")
 --
 --   Nebula.PublicEvent.set("eventRewards", {
---       [1] = { rewardCondition = { criteria = 0 },
+--       [1] = { rewardCondition = 0,
 --               maxCollectAmount = -1 }
 --   })
 --   Nebula.PublicEvent.set("startTime", 1700000000)
 --   Nebula.PublicEvent.set("startTime", 1700000000):dry()
+--
+-- Reward editing: eventRewards (and eventSpecials, rotatingEventRewards,
+-- mainEventRewards, premiumEventRewards — all List<ConditionalRewardDefinition>
+-- in the dump, pointer-slot elements) are fully navigable and writable:
+-- by index (eventRewards[1]), by nested path
+-- (eventRewards[1].lootDefinition.coinAmount), as whole element structs
+-- (eventRewards[1] = {...}, edit-in-place, partial values), and as a
+-- whole array (set("eventRewards", list) — same-size rewrite or grow).
+-- In the memory ABI rewardCondition IS the float `criteria` member —
+-- not the serialized {criteria, type} object. Nebula.PublicEvent.rewards
+-- (data/rewards.lua) carries the full reward-name reference payload,
+-- already pre-flattened to that ABI:
+--   Nebula.PublicEvent.set("eventRewards", Nebula.PublicEvent.rewards)
+
 
 local Memory    = loadModule("core/Memory.lua")
 local defineApi = loadModule("core/defineApi.lua")

@@ -6,3 +6,4 @@ temp/
 # from local packing/testing runs are never committed.
 /nebula_packed.lua
 /nebula.zip
+/*.log

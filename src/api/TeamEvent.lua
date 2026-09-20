@@ -23,7 +23,7 @@
 --   event.get("sessionEntry.numberOfParallelSessions")
 --
 --   Nebula.TeamEvent.set("eventRewards", {
---       [1] = { rewardCondition = { criteria = 0 },
+--       [1] = { rewardCondition = 0,
 --               maxCollectAmount = -1 }
 --   })
 --   Nebula.TeamEvent.set("startTime", 1700000000):dry()

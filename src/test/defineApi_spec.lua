@@ -292,6 +292,126 @@ do
 end
 
 --==================================================
+-- eventRewards: metadata node + PublicEvent editable path
+--==================================================
+-- Proves the first-class editable reward path end-to-end against the
+-- REAL EventDefinition metadata (both registered versions):
+--   * the metadata node exists (offset 0x528, Array, ConditionalReward-
+--     Definition elements) in 1.73 AND 1.74
+--   * fields()/meta() expose it through the normal dotted-path interface
+--   * get("eventRewards"), get("eventRewards[1]"), nested indexed reads
+--   * set() by nested path, whole element-struct (partial, edit-in-place),
+--     and whole-array rewrite all route through the normal set() path
+-- Same EventDefinition metadata backs TeamEvent/CommunityEvent (checked
+-- above); nothing here changes their wiring.
+--==================================================
+
+print("=== eventRewards: metadata node + editable path ===")
+do
+    local defineApi = loadModule("core/defineApi.lua")
+    local Manifest = loadModule("metadata/manifest.lua")
+
+    -- (1) metadata node shape in BOTH registered versions
+    for _, v in ipairs({ "1.73.4", "1.74.2" }) do
+        MOCK_GAME_VERSION = v
+        local metadata, ver = Manifest.resolve("EventDefinition")
+        local node = metadata and metadata.eventRewards
+        check(v .. ": eventRewards node present", node ~= nil)
+        check(v .. ": eventRewards offset 0x528, type Array",
+            node ~= nil and node.offset == 0x528 and node.type == "Array")
+        check(v .. ": elements = ConditionalRewardDefinition template",
+            node ~= nil and type(node.elements) == "table"
+            and node.elements.lootDefinition ~= nil
+            and node.elements.lootDefinition.offset == 0x20
+            and node.elements.lootDefinition.type == "Object")
+        check(v .. ": rewardCondition is the Float criteria @0x4, maxCollectAmount @0x28",
+            node ~= nil and node.elements.rewardCondition ~= nil
+            and node.elements.rewardCondition.offset == 0x4
+            and node.elements.rewardCondition.type == "Float"
+            and node.elements.maxCollectAmount ~= nil
+            and node.elements.maxCollectAmount.offset == 0x28)
+    end
+
+    -- (2) the editable path against the real metadata
+    MOCK_GAME_VERSION = "1.73.4"
+    local FB    = 0x100000
+    local SLOTS = 0x200000
+    local E1    = 0x300000
+    local LOOT  = 0x400000
+    -- std::vector header at FB+0x528 (defineApi's default ABI for
+    -- EventDefinition arrays): begin/end/capEnd, 1 pointer-slot element
+    fakeMemory[FB + 0x528] = SLOTS
+    fakeMemory[FB + 0x530] = SLOTS + 0x8
+    fakeMemory[FB + 0x538] = SLOTS + 0x8
+    fakeMemory[SLOTS] = E1
+    fakeMemory[E1 + 0x4] = 1.5        -- rewardCondition (float criteria)
+    fakeMemory[E1 + 0x20] = LOOT      -- lootDefinition pointer
+    fakeMemory[E1 + 0x28] = 100       -- maxCollectAmount
+    fakeMemory[LOOT + 0x20] = 500     -- LootDefinition.coinAmount
+
+    local api = defineApi.create({
+        struct = "EventDefinition", name = "PublicEvent",
+        resolve = function() return FB end,
+    })
+
+    local ids = api.fields()
+    local hasEventRewards = false
+    for _, id in ipairs(ids) do
+        if id == "eventRewards" then hasEventRewards = true end
+    end
+    check("fields() includes 'eventRewards'", hasEventRewards)
+
+    local m = api.meta("eventRewards")
+    check("meta('eventRewards') reports offset/repeated/known/address",
+        m ~= nil and m.offset == 0x528 and m.repeated == true
+        and m.known == true and m.address == FB + 0x528,
+        tostring(m and m.address))
+
+    local rewards = api.get("eventRewards")
+    check("get('eventRewards') decodes elements",
+        type(rewards) == "table" and #rewards == 1,
+        tostring(rewards and #rewards))
+    check("element decodes maxCollectAmount",
+        rewards and rewards[1] and rewards[1].maxCollectAmount == 100,
+        tostring(rewards and rewards[1] and rewards[1].maxCollectAmount))
+    check("element decodes nested lootDefinition field",
+        rewards and rewards[1].lootDefinition ~= nil
+        and rewards[1].lootDefinition.coinAmount == 500)
+
+    local elem = api.get("eventRewards[1]")
+    check("get('eventRewards[1]') returns the element table",
+        type(elem) == "table" and elem.maxCollectAmount == 100,
+        tostring(elem and elem.maxCollectAmount))
+
+    local op = api.set("eventRewards[1].maxCollectAmount", 999)
+    check("set('eventRewards[1].maxCollectAmount', 999) routes through set()",
+        op._ok == true, tostring(op._err))
+    check("indexed nested write landed",
+        api.get("eventRewards[1].maxCollectAmount") == 999)
+
+    local op2 = api.set("eventRewards[1]", { maxCollectAmount = 555 })
+    check("whole element-struct set (partial) succeeds",
+        op2._ok == true, tostring(op2._err))
+    check("element write preserved rewardCondition (edit-in-place)",
+        api.get("eventRewards[1].rewardCondition") == 1.5,
+        tostring(api.get("eventRewards[1].rewardCondition")))
+    check("element write landed",
+        api.get("eventRewards[1].maxCollectAmount") == 555)
+
+    local list = api.get("eventRewards")
+    list[1].maxCollectAmount = 777
+    local op3 = api.set("eventRewards", list)
+    check("whole-array set('eventRewards', list) succeeds",
+        op3._ok == true, tostring(op3._err))
+    check("whole-array write landed",
+        api.get("eventRewards[1].maxCollectAmount") == 777)
+    check("slot pointer unchanged (no reallocation on same-size rewrite)",
+        fakeMemory[SLOTS] == E1)
+
+    MOCK_GAME_VERSION = nil
+end
+
+--==================================================
 -- Summary
 --==================================================
 

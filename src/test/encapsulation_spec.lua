@@ -154,7 +154,7 @@ do
     check("SDK wired: PublicEvent", _G.Nebula.PublicEvent ~= nil, "nil")
     check("SDK wired: Memory", _G.Nebula.Memory ~= nil, "nil")
     check("SDK wired: Cache", _G.Nebula.Cache ~= nil, "nil")
-    check("SDK wired: VERSION", _G.Nebula.VERSION == "1.0.0",
+    check("SDK wired: VERSION", _G.Nebula.VERSION == "1.0.1",
         tostring(_G.Nebula.VERSION))
 
     local leaked = {}
@@ -301,7 +301,7 @@ do
         check("packed: SDK fully wired (Memory)",
             pn and pn.Memory ~= nil, "nil")
         check("packed: VERSION present",
-            pn and pn.VERSION == "1.0.0", tostring(pn and pn.VERSION))
+            pn and pn.VERSION == "1.0.1", tostring(pn and pn.VERSION))
         check("packed chunk returns the exported table",
             ok == true and ret == pn, tostring(ret))
 

@@ -146,8 +146,16 @@ Nebula.defineApi = loadModule("core/defineApi.lua").create
 -- core/Memory.lua), but all three share the same physical
 -- EventDefinition struct and therefore the same metadata.
 Nebula.PublicEvent     = loadModule("api/PublicEvent.lua")
+-- Full reward-name reference payload for editing the shared
+-- EventDefinition reward arrays (eventRewards, eventSpecials,
+-- rotatingEventRewards, mainEventRewards, premiumEventRewards):
+--   Nebula.PublicEvent.set("eventRewards", Nebula.PublicEvent.rewards)
+-- The same plain table is valid for Nebula.TeamEvent and
+-- Nebula.CommunityEvent (same struct, same metadata).
+Nebula.PublicEvent.rewards = loadModule("data/rewards.lua")
 Nebula.TeamEvent       = loadModule("api/TeamEvent.lua")
 Nebula.CommunityEvent  = loadModule("api/CommunityEvent.lua")
+
 
 -- Expose the type registry and Memory layer for advanced/extension
 -- use (e.g. a consumer registering a custom type via
