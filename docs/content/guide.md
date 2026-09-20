@@ -473,6 +473,42 @@ ASCII bytes of `"community Showcase\0"`) with vtable-marker
 validation (`0x6D6F631E` at `base + 0x8`), rather than the AOB
 byte-signature scanning used by PublicEvent and TeamEvent.
 
+### Reward editing (`eventRewards`)
+
+The reward arrays on the shared EventDefinition struct
+(`eventRewards`, `eventSpecials`, `rotatingEventRewards`,
+`mainEventRewards`, `premiumEventRewards`) are fully navigable and
+writable through the normal dotted-path interface:
+
+```lua
+Nebula.PublicEvent.get("eventRewards")                          -- all reward tiers
+Nebula.PublicEvent.get("eventRewards[1]")                       -- one element struct
+Nebula.PublicEvent.get("eventRewards[1].lootDefinition.coinAmount")
+Nebula.PublicEvent.set("eventRewards[1].maxCollectAmount", 999)
+Nebula.PublicEvent.set("eventRewards[1]", { maxCollectAmount = 555 })  -- edit-in-place
+Nebula.PublicEvent.set("eventRewards", list)                    -- whole-array rewrite (or grow)
+```
+
+In the memory ABI `rewardCondition` **is** the float `criteria`
+member — not the serialized `{criteria, type}` object. Note that a
+whole-array write replaces (and truncates to) the written size; to
+extend the live set, read it first, append, and write back.
+
+`Nebula.PublicEvent.rewards` (`src/data/rewards.lua`) carries the
+full reward-name reference payload — every reward tier with its
+complete reward names — pre-flattened to the memory ABI, so it can be
+passed straight to `set()`:
+
+```lua
+Nebula.PublicEvent.set("eventRewards", Nebula.PublicEvent.rewards)
+```
+
+The same table is valid for `Nebula.TeamEvent` and
+`Nebula.CommunityEvent` — they share the identical EventDefinition
+reward arrays. See the [PublicEvent API](api/publicevent.md) for the
+full reference.
+
+
 GG value-type flags used throughout Nebula (`core/Memory.lua`
 `M.FLAGS`):
 
