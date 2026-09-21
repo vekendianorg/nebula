@@ -149,6 +149,7 @@ Nebula.PublicEvent     = loadModule("api/PublicEvent.lua")
 Nebula.TeamEvent       = loadModule("api/TeamEvent.lua")
 Nebula.CommunityEvent  = loadModule("api/CommunityEvent.lua")
 
+
 -- Expose the type registry and Memory layer for advanced/extension
 -- use (e.g. a consumer registering a custom type via
 -- Nebula.Type.register("MyType", impl)).

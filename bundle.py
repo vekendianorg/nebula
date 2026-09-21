@@ -221,7 +221,7 @@ def bundle(output_file, version=None):
     tag        = ""
 
     print()
-    print(f"[✔] Output  →  '{output_file}'{tag}")
+    print(f"[OK] Output  ->  '{output_file}'{tag}")
     print(f"    Modules :  {len(modules)}")
     print(f"    Lines   :  {line_count:,}")
     print(f"    Size    :  {len(out_bytes):,} B  ({len(out_bytes)/1024:.1f} KB)")
